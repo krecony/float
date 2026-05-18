@@ -23,7 +23,6 @@
         buildToolsVersion = "34.0.0";
         androidApiLevel = "34";
         androidComposition = pkgs.androidenv.composeAndroidPackages {
-          # Keep the SDK lean for physical-device Flutter development.
           buildToolsVersions = [ buildToolsVersion ];
           platformVersions = [ androidApiLevel ];
           abiVersions = [ "arm64-v8a" ];
@@ -47,9 +46,6 @@
               jdk17
               git
             ];
-            # Optional size-heavy additions (add only when needed):
-            # - emulator + system images
-            # - android-studio
           };
       }
     );
