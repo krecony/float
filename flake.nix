@@ -45,6 +45,7 @@
               androidSdk
               jdk17
               git
+              supabase-cli
             ];
           };
       }

@@ -1,0 +1,14 @@
+{
+  "name": "grouppay",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "npm run start --workspace=mobile",
+    "dev:terminal": "npm run dev --workspace=terminal",
+    "dev:web": "npm run dev --workspace=web",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

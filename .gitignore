@@ -1,3 +1,11 @@
 .direnv
 .envrc
 .dotslash-cache
+.env
+.env.local
+node_modules/
+dist/
+.expo/
+apps/*/dist
+*.log
+.DS_Store

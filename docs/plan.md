@@ -1,3 +1,7 @@
+# Product plan
+
+Implementation status and code mapping: [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # Server
 
 - Database
