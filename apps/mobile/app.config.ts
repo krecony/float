@@ -54,12 +54,18 @@ const config: ExpoConfig = {
     router: {
       origin: false,
     },
+    eas: {
+      projectId: '19c4189d-e8d0-4bd1-ac06-9334cb3ce410',
+    },
   },
 };
 
-// Nix: android-sdk dir is immutable, so we must disable auto-SDK-install
-// so the build uses the components already in the Nix store.
+// In a Nix shell the Android SDK dir is immutable, so disable auto-SDK-install.
+// On EAS (and other writable SDK environments) we leave that unset so CMake
+// and other components can be downloaded normally.
 export default withGradleProperties(config, (c) => {
-  c.modResults.push({ type: 'property', key: 'android.builder.sdkDownload', value: 'false' });
+  if (process.env.IN_NIX_SHELL) {
+    c.modResults.push({ type: 'property', key: 'android.builder.sdkDownload', value: 'false' });
+  }
   return c;
 });

@@ -14,4 +14,14 @@ config.resolver.nodeModulesPaths = [
 ];
 config.resolver.disableHierarchicalLookup = true;
 
+// Supabase optionally imports @opentelemetry/api using a dynamic import()
+// that Hermes rejects at compile time. Replace it with a no-op shim.
+const otelStub = path.resolve(projectRoot, 'otel-stub.js');
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === '@opentelemetry/api' || moduleName.startsWith('@opentelemetry/')) {
+    return { filePath: otelStub, type: 'sourceFile' };
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;

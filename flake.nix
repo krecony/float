@@ -49,6 +49,7 @@
               jdk17
               git
               supabase-cli
+							eas-cli
             ];
           };
       }
