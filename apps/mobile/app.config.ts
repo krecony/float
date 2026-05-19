@@ -1,5 +1,6 @@
-import { withGradleProperties } from '@expo/config-plugins';
+import { withAndroidManifest, withDangerousMod, withGradleProperties } from '@expo/config-plugins';
 import type { ExpoConfig } from 'expo/config';
+import fs from 'fs';
 import path from 'path';
 import { config as loadEnv } from 'dotenv';
 
@@ -63,9 +64,98 @@ const config: ExpoConfig = {
 // In a Nix shell the Android SDK dir is immutable, so disable auto-SDK-install.
 // On EAS (and other writable SDK environments) we leave that unset so CMake
 // and other components can be downloaded normally.
-export default withGradleProperties(config, (c) => {
+let result = withGradleProperties(config, (c) => {
   if (process.env.IN_NIX_SHELL) {
     c.modResults.push({ type: 'property', key: 'android.builder.sdkDownload', value: 'false' });
   }
   return c;
 });
+
+// Add NFC permission and HCE service declaration for react-native-hce.
+// These modifications mirror what is already in the committed AndroidManifest.xml,
+// ensuring clean EAS prebuilds also include them.
+result = withAndroidManifest(result, (c) => {
+  const manifest = c.modResults.manifest;
+
+  const existingPerms: string[] = (manifest['uses-permission'] ?? []).map(
+    (p: { $: { 'android:name': string } }) => p.$['android:name'],
+  );
+  if (!existingPerms.includes('android.permission.NFC')) {
+    manifest['uses-permission'] = [
+      ...(manifest['uses-permission'] ?? []),
+      { $: { 'android:name': 'android.permission.NFC' } },
+    ];
+  }
+
+  const existingFeatures: string[] = (manifest['uses-feature'] ?? []).map(
+    (f: { $: { 'android:name': string } }) => f.$['android:name'],
+  );
+  if (!existingFeatures.includes('android.hardware.nfc.hce')) {
+    manifest['uses-feature'] = [
+      ...(manifest['uses-feature'] ?? []),
+      { $: { 'android:name': 'android.hardware.nfc.hce', 'android:required': 'true' } },
+    ];
+  }
+
+  const app = manifest.application?.[0];
+  if (app) {
+    const services: any[] = app.service ?? [];
+    const hceExists = services.some(
+      (s) => s.$?.['android:name'] === 'com.reactnativehce.services.CardService',
+    );
+    if (!hceExists) {
+      app.service = [
+        ...services,
+        {
+          $: {
+            'android:name': 'com.reactnativehce.services.CardService',
+            'android:exported': 'true',
+            'android:enabled': 'false',
+            'android:permission': 'android.permission.BIND_NFC_SERVICE',
+          },
+          'intent-filter': [
+            {
+              action: [{ $: { 'android:name': 'android.nfc.cardemulation.action.HOST_APDU_SERVICE' } }],
+              category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
+            },
+          ],
+          'meta-data': [
+            {
+              $: {
+                'android:name': 'android.nfc.cardemulation.host_apdu_service',
+                'android:resource': '@xml/aid_list',
+              },
+            },
+          ],
+        },
+      ];
+    }
+  }
+
+  return c;
+});
+
+// Write aid_list.xml into the android/app/src/main/res/xml directory during prebuild.
+result = withDangerousMod(result, [
+  'android',
+  async (c) => {
+    const xmlDir = path.join(c.modRequest.platformProjectRoot, 'app/src/main/res/xml');
+    await fs.promises.mkdir(xmlDir, { recursive: true });
+    await fs.promises.writeFile(
+      path.join(xmlDir, 'aid_list.xml'),
+      `<host-apdu-service
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:description="@string/app_name"
+  android:requireDeviceUnlock="false">
+  <aid-group
+    android:category="other"
+    android:description="@string/app_name">
+    <aid-filter android:name="D2760000850101"/>
+  </aid-group>
+</host-apdu-service>\n`,
+    );
+    return c;
+  },
+]);
+
+export default result;

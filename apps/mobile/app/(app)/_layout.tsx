@@ -51,6 +51,7 @@ function TabNavigator() {
       />
       <Tabs.Screen name="approvals" options={{ href: null }} />
       <Tabs.Screen name="wallet" options={{ href: null }} />
+      <Tabs.Screen name="nfc-pay" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -144,6 +144,14 @@ export default function GroupOverviewScreen() {
           ))
         )}
 
+        <Pressable
+          style={styles.nfcBtn}
+          onPress={() => router.push('/(app)/nfc-pay')}
+        >
+          <Ionicons name="wifi-outline" size={20} color={colors.background} />
+          <Text style={styles.nfcBtnText}>Pay with NFC</Text>
+        </Pressable>
+
         {/* TODO: remove test button before production */}
         <Pressable
           style={[styles.testBtn, txLoading && styles.testBtnDisabled]}
@@ -215,7 +223,7 @@ const styles = StyleSheet.create({
   rowMeta: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
   empty: { color: colors.textMuted },
   error: { color: colors.danger },
-  testBtn: {
+  nfcBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -225,8 +233,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colors.accent,
   },
+  nfcBtnText: { color: colors.background, fontWeight: '700', fontSize: 15 },
+  testBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   testBtnDisabled: { opacity: 0.5 },
-  testBtnText: { color: colors.background, fontWeight: '700', fontSize: 15 },
+  testBtnText: { color: colors.textMuted, fontWeight: '600', fontSize: 14 },
 });
 
 function formatPan(pan: string) {

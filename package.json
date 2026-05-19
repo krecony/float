@@ -6,9 +6,14 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "patch-package",
     "dev:mobile": "npm run start --workspace=mobile",
     "dev:terminal": "npm run dev --workspace=terminal",
+    "dev:terminal-mobile": "npm run start --workspace=terminal-mobile",
     "dev:web": "npm run dev --workspace=web",
     "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
   }
 }
