@@ -13,6 +13,9 @@ export const PIN_BUFFER_PX = 16;
 /** Crossfade intro → hero over this many pixels before the hero track */
 export const INTRO_HERO_BLEND_PX = 140;
 
+/** Fade the fixed hero out over this much extra scroll after the story track ends. */
+export const HERO_RELEASE_FADE_PX = 280;
+
 export function getHeroSectionHeight() {
   return `calc(100vh + ${ANIMATION_SCROLL_VH}vh)`;
 }

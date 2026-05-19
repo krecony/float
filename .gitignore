@@ -3,9 +3,14 @@
 .dotslash-cache
 .env
 .env.local
+.idea/
 node_modules/
 dist/
 .expo/
 apps/*/dist
 *.log
 .DS_Store
+apps/website/.next/
+apps/website/out/
+website/public/downloads/
+apps/website/.next/dev/cache/*

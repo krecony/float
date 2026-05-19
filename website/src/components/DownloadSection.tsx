@@ -1,6 +1,8 @@
 "use client";
 
 import { colors } from "@/lib/colors";
+import { withBasePath } from "@/lib/basePath";
+import { APK_DOWNLOAD_PATH } from "@/lib/site";
 
 export function DownloadSection() {
   return (
@@ -9,7 +11,8 @@ export function DownloadSection() {
       style={{ background: colors.bgDeep }}
     >
       <a
-        href="#"
+        href={withBasePath(APK_DOWNLOAD_PATH)}
+        download
         className="inline-flex items-center justify-center rounded-full px-10 py-4 text-sm font-semibold text-white transition-transform hover:scale-[1.03] active:scale-[0.98]"
         style={{
           background: `linear-gradient(135deg, ${colors.gradientA}, ${colors.gradientB})`,

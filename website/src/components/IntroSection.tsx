@@ -1,8 +1,10 @@
 "use client";
 
+import { FloatMark } from "@/components/ui/FloatMark";
 import { GradientOrb } from "@/components/ui/GradientOrb";
 import { colors } from "@/lib/colors";
 import { unlockAudioFromGesture } from "@/lib/soundEffects";
+import { GROUPPAY_GITHUB_URL } from "@/lib/site";
 
 interface IntroSectionProps {
   opacity?: number;
@@ -42,19 +44,34 @@ export function IntroSection({
       />
 
       <div className="relative z-10 mx-auto max-w-2xl">
-        <span
-          className="text-xs font-semibold tracking-[0.3em] uppercase"
-          style={{ color: colors.gradientB }}
-        >
-          GroupPay
-        </span>
+        <div className="flex items-center justify-center gap-3">
+          <FloatMark className="float-mark h-12 w-12 drop-shadow-[0_10px_26px_rgba(34,211,238,0.22)]" />
+          <span
+            className="text-xs font-semibold tracking-[0.3em] uppercase"
+            style={{ color: colors.gradientB }}
+          >
+            Float
+          </span>
+        </div>
         <h1 className="mt-5 text-4xl leading-[1.08] font-semibold tracking-tight text-white sm:text-5xl md:text-6xl">
-          Convenient group transactions start now
+          Float through group payments without the dinner-table chaos
         </h1>
         <p className="mt-6 text-base leading-relaxed text-zinc-400 md:text-lg">
-          Tap to pay together. Every member approves in realtime, and shared
-          balances update instantly — no awkward splits at the table.
+          A cinematic demo for quick shared spending: one person taps, everyone
+          approves in realtime, and the whole group stays synced as the moment
+          moves.
         </p>
+
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={GROUPPAY_GITHUB_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/4 px-6 py-3 text-sm font-semibold text-white transition-colors hover:border-cyan-300/40 hover:bg-white/8"
+          >
+            GitHub
+          </a>
+        </div>
 
         <button
           type="button"
@@ -71,7 +88,7 @@ export function IntroSection({
               : { animation: "intro-continue-pulse 2.8s ease-in-out infinite" }
           }
         >
-          Click to scroll and unvaile
+          Click to scroll and unveil
         </button>
       </div>
     </section>

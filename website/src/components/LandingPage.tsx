@@ -5,13 +5,14 @@ import { useScrollStoryProgress } from "@/hooks/useScrollStoryProgress";
 import { useTimelineSounds } from "@/hooks/useTimelineSounds";
 import { getHeroSectionHeight } from "@/lib/scrollConfig";
 import { IntroSection } from "@/components/IntroSection";
+import { CtaSection } from "@/components/cta/CtaSection";
 import { HeroSection } from "@/components/hero/HeroSection";
 import { CssFallback } from "@/components/hero/CssFallback";
 
 export function LandingPage() {
   const trackRef = useRef<HTMLElement>(null);
   const [unveiled, setUnveiled] = useState(false);
-  const { progress, progressRef, heroBlend } =
+  const { progress, progressRef, heroBlend, heroVisibility } =
     useScrollStoryProgress(trackRef);
   const [isMobile, setIsMobile] = useState(false);
   const [useFallback, setUseFallback] = useState(false);
@@ -92,8 +93,8 @@ export function LandingPage() {
       <div
         className="fixed inset-0 z-[5] h-[100dvh] w-full overflow-hidden"
         style={{
-          opacity: heroBlend,
-          visibility: heroBlend > 0.01 ? "visible" : "hidden",
+          opacity: heroBlend * heroVisibility,
+          visibility: heroBlend * heroVisibility > 0.01 ? "visible" : "hidden",
           pointerEvents: "none",
           background: "#050508",
           willChange: "opacity",
@@ -110,6 +111,8 @@ export function LandingPage() {
             />
           ))}
       </div>
+
+      <CtaSection />
     </main>
   );
 }

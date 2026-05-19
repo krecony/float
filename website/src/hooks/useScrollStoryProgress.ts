@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import {
+  HERO_RELEASE_FADE_PX,
   INTRO_HERO_BLEND_PX,
   mapScrollToStory,
   PIN_BUFFER_PX,
@@ -17,8 +18,10 @@ export function useScrollStoryProgress(trackRef: RefObject<HTMLElement | null>) 
   const peakRef = useRef(isStoryLocked() ? 1 : 0);
   const completedRef = useRef(isStoryLocked());
   const progressRef = useRef(isStoryLocked() ? 1 : 0);
+  const targetProgressRef = useRef(isStoryLocked() ? 1 : 0);
   const [progress, setProgress] = useState(isStoryLocked() ? 1 : 0);
   const [heroBlend, setHeroBlend] = useState(isStoryLocked() ? 1 : 0);
+  const [heroVisibility, setHeroVisibility] = useState(isStoryLocked() ? 0 : 1);
 
   useLayoutEffect(() => {
     if ("scrollRestoration" in history) {
@@ -30,8 +33,10 @@ export function useScrollStoryProgress(trackRef: RefObject<HTMLElement | null>) 
       peakRef.current = 0;
       completedRef.current = false;
       progressRef.current = 0;
+      targetProgressRef.current = 0;
       setProgress(0);
       setHeroBlend(0);
+      setHeroVisibility(1);
     }
 
     const track = trackRef.current;
@@ -47,8 +52,8 @@ export function useScrollStoryProgress(trackRef: RefObject<HTMLElement | null>) 
       if (completedRef.current) return;
       completedRef.current = true;
       peakRef.current = 1;
+      targetProgressRef.current = 1;
       lockStory();
-      commit(1);
       setHeroBlend(1);
     };
 
@@ -82,37 +87,75 @@ export function useScrollStoryProgress(trackRef: RefObject<HTMLElement | null>) 
       setHeroBlend(blend);
     };
 
+    const updateHeroVisibility = () => {
+      const releaseStart = track.offsetTop + track.offsetHeight - window.innerHeight;
+      const fadeProgress =
+        HERO_RELEASE_FADE_PX <= 0
+          ? 1
+          : (window.scrollY - releaseStart) / HERO_RELEASE_FADE_PX;
+      setHeroVisibility(1 - Math.min(1, Math.max(0, fadeProgress)));
+    };
+
     let raf = 0;
-    const update = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        updateHeroBlend();
+    let lastTs = 0;
 
-        if (completedRef.current) {
-          commit(peakRef.current);
-          return;
-        }
+    const tick = (ts: number) => {
+      if (!lastTs) lastTs = ts;
+      const dt = Math.min(40, ts - lastTs);
+      lastTs = ts;
 
+      updateHeroBlend();
+      updateHeroVisibility();
+
+      if (!completedRef.current) {
         const measured = measure();
-
         if (measured > peakRef.current + 0.0001) {
           peakRef.current = measured;
-          commit(measured);
+          targetProgressRef.current = measured;
         }
 
         if (peakRef.current >= STORY_COMPLETE) {
           finish();
         }
-      });
+      }
+
+      const target = completedRef.current ? 1 : targetProgressRef.current;
+      const current = progressRef.current;
+      const smoothing = 1 - Math.exp(-dt / 90);
+      const next =
+        Math.abs(target - current) < 0.0005
+          ? target
+          : current + (target - current) * smoothing;
+
+      if (next > current + 0.00005 || completedRef.current) {
+        commit(next);
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    const update = () => {
+      if (!completedRef.current) {
+        const measured = measure();
+        if (measured > peakRef.current + 0.0001) {
+          peakRef.current = measured;
+          targetProgressRef.current = measured;
+        }
+      }
+      updateHeroBlend();
+      updateHeroVisibility();
     };
 
     if (completedRef.current) {
       progressRef.current = 1;
+      targetProgressRef.current = 1;
       setProgress(1);
       setHeroBlend(1);
+      setHeroVisibility(0);
     }
 
     update();
+    raf = requestAnimationFrame(tick);
     window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
 
@@ -123,5 +166,5 @@ export function useScrollStoryProgress(trackRef: RefObject<HTMLElement | null>) 
     };
   }, [trackRef]);
 
-  return { progress, progressRef, heroBlend };
+  return { progress, progressRef, heroBlend, heroVisibility };
 }

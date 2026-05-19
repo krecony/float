@@ -7,8 +7,6 @@ import { TerminalScreen } from "./screens/TerminalScreen";
 import { MemberApprovalScreen } from "./screens/MemberApprovalScreen";
 import { PaymentScreen } from "./screens/PaymentScreen";
 import { AmbientGradients } from "./effects/AmbientGradients";
-import { getDownloadOpacity } from "@/lib/scrollConfig";
-import { DownloadOverlay } from "./DownloadOverlay";
 
 interface CssFallbackProps {
   progress: number;
@@ -121,8 +119,6 @@ export function CssFallback({ progress, isMobile }: CssFallbackProps) {
           style={{ left: "42%", top: "46%" }}
         />
       )}
-
-      <DownloadOverlay opacity={getDownloadOpacity(progress)} />
     </div>
   );
 }
