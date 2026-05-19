@@ -14,13 +14,12 @@ type Props = {
 export function Screen({ title, subtitle, headerRight, children, scroll = true }: Props) {
   const content = (
     <View style={styles.inner}>
-      {headerRight ? (
-        <View style={styles.headerRow}>
-          <View style={styles.headerSpacer} />
-          {headerRight}
+      {title || headerRight ? (
+        <View style={styles.titleRow}>
+          {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
+          {headerRight ? <View style={styles.headerRight}>{headerRight}</View> : null}
         </View>
       ) : null}
-      {title ? <Text style={styles.title}>{title}</Text> : null}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {children}
     </View>
@@ -41,13 +40,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { flexGrow: 1, padding: spacing.lg },
   inner: { flex: 1, padding: spacing.lg, gap: spacing.md },
-  headerRow: {
+  titleRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  headerSpacer: { flex: 1 },
-  title: { ...typography.title, color: colors.text },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.sm },
+  title: { ...typography.title, color: colors.text, flex: 1 },
+  headerRight: { flexShrink: 0 },
+  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.sm, marginTop: -spacing.sm },
 });

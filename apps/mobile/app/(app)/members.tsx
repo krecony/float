@@ -8,10 +8,21 @@ export default function MembersScreen() {
   const { activeGroupId } = useAuth();
   const { overview, loading } = useGroupOverview(activeGroupId);
 
+  const hasGroup = !!activeGroupId;
+  const members = overview?.members ?? [];
+
   return (
     <Screen title="Group members">
       {loading ? <Text style={styles.muted}>Loading…</Text> : null}
-      {overview?.members.map((m) => (
+      {!loading && !hasGroup ? (
+        <Text style={styles.muted}>
+          Create or join a group to see its members here.
+        </Text>
+      ) : null}
+      {!loading && hasGroup && members.length === 0 ? (
+        <Text style={styles.muted}>No members found.</Text>
+      ) : null}
+      {members.map((m) => (
         <View key={m.user_id} style={styles.card}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>

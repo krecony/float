@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -25,7 +26,7 @@ export function GroupSwitcher() {
   return (
     <>
       <Pressable style={styles.trigger} onPress={() => setOpen(true)}>
-        <Text style={styles.triggerText}>Groups</Text>
+        <Ionicons name="swap-horizontal-outline" size={22} color={colors.accent} />
       </Pressable>
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
@@ -92,10 +93,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  triggerText: { color: colors.accent, fontWeight: '600', fontSize: 14 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
