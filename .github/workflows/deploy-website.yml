@@ -43,7 +43,7 @@ jobs:
       - name: Build for GitHub Pages
         run: npm run build:pages
         env:
-          NEXT_PUBLIC_BASE_PATH: /slop
+          NEXT_PUBLIC_BASE_PATH: /float
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
