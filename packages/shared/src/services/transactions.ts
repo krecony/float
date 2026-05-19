@@ -68,6 +68,28 @@ export async function createTransactionRequest(
   return tx;
 }
 
+export async function updateTransactionParticipants(
+  client: GroupPayClient,
+  transactionId: string,
+  participantUserIds: string[],
+): Promise<void> {
+  const { error: delError } = await client
+    .from('transaction_participants')
+    .delete()
+    .eq('transaction_id', transactionId);
+  if (delError) throw delError;
+
+  if (participantUserIds.length > 0) {
+    const { error: insError } = await client.from('transaction_participants').insert(
+      participantUserIds.map((user_id) => ({
+        transaction_id: transactionId,
+        user_id,
+      })),
+    );
+    if (insError) throw insError;
+  }
+}
+
 export async function approveTransaction(
   client: GroupPayClient,
   transactionId: string,

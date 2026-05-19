@@ -1,24 +1,45 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import {
+  subscribeToGroupTransactions,
+  unsubscribe,
+  updateTransactionParticipants,
+  type Transaction,
+} from '@grouppay/shared';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HCESession, NFCTagType4, NFCTagType4NDEFContentType } from 'react-native-hce';
+import { ParticipantSelectModal } from '../../src/components/ParticipantSelectModal';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useGroupData } from '../../src/providers/GroupDataProvider';
+import { useSupabase } from '../../src/providers/SupabaseProvider';
 import { colors, spacing, typography } from '../../src/theme';
 
-type Status = 'waiting' | 'read' | 'error' | 'unsupported';
+type Status = 'waiting' | 'read' | 'selecting' | 'done' | 'error' | 'unsupported';
 
 export default function NfcPayScreen() {
   const router = useRouter();
+  const supabase = useSupabase();
   const { activeGroupId, session } = useAuth();
+  const { overview } = useGroupData();
+
   const [status, setStatus] = useState<Status>('waiting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
-  const sessionRef = useRef<HCESession | null>(null);
+  const hceSessionRef = useRef<HCESession | null>(null);
+  const statusRef = useRef<Status>('waiting');
+  statusRef.current = status;
 
-  // Pulsing ring animation
+  // Pulsing ring animation — runs while waiting
   useEffect(() => {
+    if (status !== 'waiting') {
+      pulseLoop.current?.stop();
+      return;
+    }
     pulseLoop.current = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -37,73 +58,108 @@ export default function NfcPayScreen() {
     );
     pulseLoop.current.start();
     return () => pulseLoop.current?.stop();
-  }, [pulseAnim]);
+  }, [status, pulseAnim]);
 
-  useEffect(() => {
-    if (Platform.OS !== 'android') {
-      setStatus('unsupported');
-      return;
-    }
+  // HCE session — starts fresh every time the screen is focused, cleans up on blur.
+  // Using useFocusEffect ensures the status and session reset when navigating back
+  // and re-opening the screen, fixing the "stuck in read state" bug.
+  useFocusEffect(
+    useCallback(() => {
+      setStatus('waiting');
+      setErrorMsg(null);
+      setCurrentTransaction(null);
+      pulseAnim.setValue(1);
 
-    if (!activeGroupId || !session?.user.id) {
-      setStatus('error');
-      setErrorMsg('No active group or session. Go back and try again.');
-      return;
-    }
-
-    let active = true;
-
-    async function startHce() {
-      try {
-        const payload = `GP|${activeGroupId}|${session!.user.id}`;
-
-        const tag = new NFCTagType4({
-          type: NFCTagType4NDEFContentType.Text,
-          content: payload,
-          writable: false,
-        });
-
-        const hceSession = await HCESession.getInstance();
-        // Reset any stale singleton state from a previous session before
-        // setting the new application — without this, revisiting the screen
-        // causes "no application set" because the service is still running.
-        await hceSession.setEnabled(false);
-        hceSession.setApplication(tag);
-        await hceSession.setEnabled(true);
-        sessionRef.current = hceSession;
-
-        const removeListener = hceSession.on(HCESession.Events.HCE_STATE_READ, () => {
-          if (!active) return;
-          setStatus('read');
-          pulseLoop.current?.stop();
-          // Stop HCE after a successful read so we don't broadcast indefinitely
-          hceSession.setEnabled(false).catch(() => {});
-        });
-
-        return () => {
-          removeListener();
-        };
-      } catch (e) {
-        if (!active) return;
-        setStatus('error');
-        setErrorMsg(e instanceof Error ? e.message : 'Failed to start NFC');
+      if (Platform.OS !== 'android') {
+        setStatus('unsupported');
+        return;
       }
-    }
+      if (!activeGroupId || !session?.user.id) {
+        setStatus('error');
+        setErrorMsg('No active group or session. Go back and try again.');
+        return;
+      }
 
-    let cleanupListeners: (() => void) | undefined;
+      let active = true;
+      let removeReadListener: (() => void) | undefined;
 
-    startHce().then((cleanup) => {
-      cleanupListeners = cleanup;
-    });
+      async function startHce() {
+        try {
+          const payload = `GP|${activeGroupId}|${session!.user.id}`;
+          const tag = new NFCTagType4({
+            type: NFCTagType4NDEFContentType.Text,
+            content: payload,
+            writable: false,
+          });
+
+          const hce = await HCESession.getInstance();
+          // Reset any stale singleton state before setting the new application.
+          await hce.setEnabled(false);
+          hce.setApplication(tag);
+          await hce.setEnabled(true);
+          hceSessionRef.current = hce;
+
+          removeReadListener = hce.on(HCESession.Events.HCE_STATE_READ, () => {
+            if (!active || statusRef.current !== 'waiting') return;
+            setStatus('read');
+            hce.setEnabled(false).catch(() => {});
+          });
+        } catch (e) {
+          if (!active) return;
+          setStatus('error');
+          setErrorMsg(e instanceof Error ? e.message : 'Failed to start NFC');
+        }
+      }
+
+      void startHce();
+
+      return () => {
+        active = false;
+        removeReadListener?.();
+        hceSessionRef.current?.setEnabled(false).catch(() => {});
+      };
+    }, [activeGroupId, session, pulseAnim])
+  );
+
+  // After the terminal reads the tag, subscribe to the group's transaction inserts.
+  // The first new transaction created is the one the terminal is processing.
+  useEffect(() => {
+    if (status !== 'read' || !activeGroupId) return;
+
+    const channel = subscribeToGroupTransactions(
+      supabase,
+      activeGroupId,
+      {
+        onInsert: (tx) => {
+          if (statusRef.current !== 'read') return;
+          setCurrentTransaction(tx);
+          setStatus('selecting');
+        },
+      },
+      'nfc-pay-watcher',
+    );
 
     return () => {
-      active = false;
-      cleanupListeners?.();
-      sessionRef.current?.setEnabled(false).catch(() => {});
+      unsubscribe(supabase, channel);
     };
-  }, [activeGroupId, session]);
+  }, [status, activeGroupId, supabase]);
 
-  const isRead = status === 'read';
+  const handleParticipantsConfirmed = async (participantIds: string[]) => {
+    if (!currentTransaction) return;
+    setConfirming(true);
+    try {
+      await updateTransactionParticipants(supabase, currentTransaction.id, participantIds);
+      setStatus('done');
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'Failed to update participants');
+      setStatus('error');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const members = overview?.members ?? [];
+  const isWaiting = status === 'waiting';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -116,14 +172,22 @@ export default function NfcPayScreen() {
         </View>
 
         <View style={styles.nfcArea}>
-          {status === 'waiting' ? (
+          {isWaiting ? (
             <Animated.View
               style={[styles.ring, styles.ringPulse, { transform: [{ scale: pulseAnim }] }]}
             />
           ) : null}
           <View style={[styles.ring, styles.ringInner]} />
-          <View style={[styles.iconCircle, isRead && styles.iconCircleSuccess]}>
-            <Text style={styles.nfcEmoji}>{isRead ? '✓' : '📲'}</Text>
+          <View
+            style={[
+              styles.iconCircle,
+              status === 'read' && styles.iconCircleRead,
+              status === 'done' && styles.iconCircleDone,
+            ]}
+          >
+            <Text style={styles.nfcEmoji}>
+              {status === 'done' ? '✓' : status === 'read' ? '⏳' : '📲'}
+            </Text>
           </View>
         </View>
 
@@ -132,19 +196,30 @@ export default function NfcPayScreen() {
             <Text style={styles.mainText}>Hold phone to terminal</Text>
             <Text style={styles.subText}>
               Keep this screen open and bring the back of your phone close to
-              the{' '}
-              <Text style={styles.accentText}>GroupPay Terminal</Text> device.
+              the <Text style={styles.accentText}>GroupPay Terminal</Text> device.
             </Text>
           </View>
         )}
 
-        {status === 'read' && (
-          <View style={[styles.messageBox, styles.messageBoxSuccess]}>
-            <Text style={[styles.mainText, styles.successText]}>Sent to terminal!</Text>
+        {(status === 'read' || status === 'selecting') && (
+          <View style={[styles.messageBox, styles.messageBoxRead]}>
+            <Text style={[styles.mainText, styles.accentText]}>Sent to terminal!</Text>
             <Text style={styles.subText}>
-              The terminal will now enter the amount. You will receive an
-              approval request shortly.
+              Waiting for the merchant to confirm the amount. You will be asked
+              to choose who splits the payment.
             </Text>
+          </View>
+        )}
+
+        {status === 'done' && currentTransaction && (
+          <View style={[styles.messageBox, styles.messageBoxDone]}>
+            <Text style={[styles.mainText, styles.accentText]}>Payment confirmed</Text>
+            <Text style={styles.subText}>
+              The transaction has been sent for approval to all participants.
+            </Text>
+            <Pressable style={styles.doneBtn} onPress={() => router.back()}>
+              <Text style={styles.doneBtnText}>Done</Text>
+            </Pressable>
           </View>
         )}
 
@@ -165,11 +240,16 @@ export default function NfcPayScreen() {
         )}
 
         <View style={styles.hint}>
-          <Text style={styles.hintText}>
-            NFC must be enabled in Android Settings. HCE is Android-only.
-          </Text>
+          <Text style={styles.hintText}>NFC must be enabled in Android Settings. Android only.</Text>
         </View>
       </View>
+
+      <ParticipantSelectModal
+        visible={status === 'selecting'}
+        members={members}
+        onConfirm={handleParticipantsConfirmed}
+        onCancel={() => setStatus('read')}
+      />
     </SafeAreaView>
   );
 }
@@ -188,12 +268,7 @@ const styles = StyleSheet.create({
   backText: { color: colors.textMuted, fontSize: 15 },
   title: { ...typography.title, color: colors.text },
 
-  nfcArea: {
-    width: 220,
-    height: 220,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  nfcArea: { width: 220, height: 220, alignItems: 'center', justifyContent: 'center' },
   ring: {
     position: 'absolute',
     width: 170,
@@ -203,12 +278,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
     opacity: 0.2,
   },
-  ringPulse: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    opacity: 0.1,
-  },
+  ringPulse: { width: 220, height: 220, borderRadius: 110, opacity: 0.1 },
   ringInner: { width: 130, height: 130, borderRadius: 65, opacity: 0.3 },
   iconCircle: {
     width: 100,
@@ -220,10 +290,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircleSuccess: {
-    backgroundColor: 'rgba(61,255,168,0.12)',
-    borderColor: colors.accent,
-  },
+  iconCircleRead: { borderColor: colors.warning },
+  iconCircleDone: { backgroundColor: 'rgba(61,255,168,0.12)', borderColor: colors.accent },
   nfcEmoji: { fontSize: 42 },
 
   messageBox: {
@@ -236,12 +304,21 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignItems: 'center',
   },
-  messageBoxSuccess: { borderColor: colors.accentDim },
+  messageBoxRead: { borderColor: colors.accentDim },
+  messageBoxDone: { borderColor: colors.accent },
   mainText: { ...typography.headline, color: colors.text, textAlign: 'center' },
-  successText: { color: colors.accent },
   subText: { ...typography.body, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
-  accentText: { color: colors.accent, fontWeight: '600' },
+  accentText: { color: colors.accent },
   errorTitle: { ...typography.headline, color: colors.danger, textAlign: 'center' },
+
+  doneBtn: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: colors.accent,
+    borderRadius: 10,
+  },
+  doneBtnText: { color: colors.background, fontWeight: '700', fontSize: 15 },
 
   hint: { marginTop: 'auto', paddingBottom: spacing.lg },
   hintText: { ...typography.caption, color: colors.border, textAlign: 'center' },
