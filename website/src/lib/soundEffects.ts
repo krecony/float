@@ -1,7 +1,9 @@
+import { withBasePath } from "@/lib/basePath";
+
 const SOUNDS = {
-  tapContact: "/sounds/tap-contact.mp3",
-  applePay: "/sounds/apple-pay.mp3",
-  approval: "/sounds/approval.mp3",
+  tapContact: withBasePath("/sounds/tap-contact.mp3"),
+  applePay: withBasePath("/sounds/apple-pay.mp3"),
+  approval: withBasePath("/sounds/approval.mp3"),
 } as const;
 
 type SoundKey = keyof typeof SOUNDS;
