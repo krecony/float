@@ -127,6 +127,20 @@ export async function setIdVerified(
   return data;
 }
 
+export async function listPaymentMethods(
+  client: GroupPayClient,
+  userId: string,
+): Promise<PaymentMethod[]> {
+  const { data, error } = await client
+    .from('payment_methods')
+    .select('*')
+    .eq('user_id', userId)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 function digitsOnlyPan(pan: string): string {
   return pan.replace(/\D/g, '');
 }

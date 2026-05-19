@@ -1,15 +1,29 @@
 import { Ionicons } from '@expo/vector-icons';
+import { listPaymentMethods, type PaymentMethod } from '@grouppay/shared';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '../../src/components/Screen';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useSupabase } from '../../src/providers/SupabaseProvider';
 import { colors, spacing, typography } from '../../src/theme';
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { profile, userGroups, signOut } = useAuth();
+  const supabase = useSupabase();
+  const { profile, session, signOut } = useAuth();
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [pmLoading, setPmLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+    setPmLoading(true);
+    listPaymentMethods(supabase, session.user.id)
+      .then(setPaymentMethods)
+      .catch(console.error)
+      .finally(() => setPmLoading(false));
+  }, [session?.user.id, supabase]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -45,14 +59,30 @@ export default function AccountScreen() {
         </View>
       </View>
 
-      <Text style={styles.section}>Your groups ({userGroups.length})</Text>
-      {userGroups.length === 0 ? (
-        <Text style={styles.muted}>No groups yet.</Text>
+      <Text style={styles.section}>Payment methods</Text>
+      {pmLoading ? (
+        <Text style={styles.muted}>Loading…</Text>
+      ) : paymentMethods.length === 0 ? (
+        <Text style={styles.muted}>No payment methods saved.</Text>
       ) : (
-        userGroups.map((g) => (
-          <View key={g.id} style={styles.groupRow}>
-            <Text style={styles.groupName}>{g.name}</Text>
-            <Text style={styles.groupCode}>{g.invite_code}</Text>
+        paymentMethods.map((pm) => (
+          <View key={pm.id} style={styles.cardRow}>
+            <View style={styles.cardIcon}>
+              <Ionicons name="card-outline" size={20} color={colors.accent} />
+            </View>
+            <View style={styles.cardInfo}>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardLabel}>{pm.label}</Text>
+                {pm.is_default ? (
+                  <View style={styles.defaultBadge}>
+                    <Text style={styles.defaultText}>Default</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.cardMeta}>
+                •••• {pm.last_four} · {pm.brand.toUpperCase()} · {String(pm.exp_month).padStart(2, '0')}/{String(pm.exp_year).slice(-2)}
+              </Text>
+            </View>
           </View>
         ))
       )}
@@ -105,16 +135,35 @@ const styles = StyleSheet.create({
   pillMuted: { color: colors.textMuted },
   section: { ...typography.headline, color: colors.text, marginTop: spacing.sm },
   muted: { color: colors.textMuted },
-  groupRow: {
+  cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.md,
     backgroundColor: colors.surface,
     padding: spacing.md,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  groupName: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  groupCode: { color: colors.textMuted, fontSize: 13 },
+  cardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardInfo: { flex: 1 },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cardLabel: { color: colors.text, fontSize: 15, fontWeight: '600', flex: 1 },
+  defaultBadge: {
+    backgroundColor: 'rgba(61, 255, 168, 0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  defaultText: { color: colors.accent, fontSize: 11, fontWeight: '600' },
+  cardMeta: { color: colors.textMuted, fontSize: 13, marginTop: 3 },
   signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
