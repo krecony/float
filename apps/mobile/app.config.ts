@@ -1,3 +1,4 @@
+import { withGradleProperties } from '@expo/config-plugins';
 import type { ExpoConfig } from 'expo/config';
 import path from 'path';
 import { config as loadEnv } from 'dotenv';
@@ -39,7 +40,11 @@ const config: ExpoConfig = {
   web: {
     favicon: './assets/favicon.png',
   },
-  plugins: ['expo-router'],
+  plugins: [
+    'expo-router',
+    'expo-dev-client',
+    ['expo-notifications', { androidMode: 'default' }],
+  ],
   experiments: {
     typedRoutes: true,
   },
@@ -52,4 +57,9 @@ const config: ExpoConfig = {
   },
 };
 
-export default config;
+// Nix: android-sdk dir is immutable, so we must disable auto-SDK-install
+// so the build uses the components already in the Nix store.
+export default withGradleProperties(config, (c) => {
+  c.modResults.push({ type: 'property', key: 'android.builder.sdkDownload', value: 'false' });
+  return c;
+});

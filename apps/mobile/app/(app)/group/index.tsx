@@ -6,17 +6,24 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../../src/components/Button';
 import { GroupSwitcher } from '../../../src/components/GroupSwitcher';
+import { NewTransactionBanner } from '../../../src/components/NewTransactionBanner';
+import { ParticipantSelectModal } from '../../../src/components/ParticipantSelectModal';
 import { Screen } from '../../../src/components/Screen';
 import { useGroupOverview } from '../../../src/hooks/useGroupOverview';
 import { useAuth } from '../../../src/providers/AuthProvider';
+import { useSupabase } from '../../../src/providers/SupabaseProvider';
 import { colors, spacing, typography } from '../../../src/theme';
+import { createDemoTransaction } from '../../../src/utils/createDemoTransaction';
 
 export default function GroupOverviewScreen() {
   const router = useRouter();
-  const { activeGroupId } = useAuth();
+  const supabase = useSupabase();
+  const { activeGroupId, session } = useAuth();
   const { overview, loading, error } = useGroupOverview(activeGroupId);
   const [showPan, setShowPan] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showParticipantModal, setShowParticipantModal] = useState(false);
+  const [txLoading, setTxLoading] = useState(false);
 
   if (!activeGroupId) {
     return (
@@ -44,7 +51,7 @@ export default function GroupOverviewScreen() {
     );
   }
 
-  const { group, transactions } = overview;
+  const { group, members, transactions } = overview;
   const virtualCard = overview.virtual_card;
 
   const cardPan = virtualCard ? formatPan(virtualCard.pan) : '';
@@ -59,69 +66,105 @@ export default function GroupOverviewScreen() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
-    <Screen
-      headerRight={<GroupSwitcher />}
-      title={group.name}
-    >
-      <Pressable style={styles.inviteRow} onPress={handleCopy}>
-        <Text style={styles.inviteLabel}>Invite code</Text>
-        <Text style={styles.inviteCode}>{group.invite_code}</Text>
-        <Ionicons
-          name={copied ? 'checkmark-outline' : 'copy-outline'}
-          size={18}
-          color={copied ? colors.accent : colors.textMuted}
-        />
-      </Pressable>
+  const handleParticipantsConfirmed = async (participantIds: string[]) => {
+    if (!session?.user.id) return;
+    setShowParticipantModal(false);
+    setTxLoading(true);
+    try {
+      await createDemoTransaction(supabase, group.id, session.user.id, participantIds);
+    } catch (e) {
+      console.error('Demo transaction failed', e);
+    } finally {
+      setTxLoading(false);
+    }
+  };
 
-      <View style={styles.cardPanel}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardLabel}>Group virtual card</Text>
+  return (
+    <>
+      <NewTransactionBanner />
+
+      <Screen
+        headerRight={<GroupSwitcher />}
+        title={group.name}
+      >
+        <Pressable style={styles.inviteRow} onPress={handleCopy}>
+          <Text style={styles.inviteLabel}>Invite code</Text>
+          <Text style={styles.inviteCode}>{group.invite_code}</Text>
+          <Ionicons
+            name={copied ? 'checkmark-outline' : 'copy-outline'}
+            size={18}
+            color={copied ? colors.accent : colors.textMuted}
+          />
+        </Pressable>
+
+        <View style={styles.cardPanel}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardLabel}>Group virtual card</Text>
+            {virtualCard ? (
+              <View
+                style={[
+                  styles.statusPill,
+                  virtualCard.status === 'paused' ? styles.statusPaused : styles.statusActive,
+                ]}
+              >
+                <Text style={styles.statusText}>
+                  {virtualCard.status === 'paused' ? 'Paused' : 'Active'}
+                </Text>
+              </View>
+            ) : null}
+          </View>
           {virtualCard ? (
-            <View
-              style={[
-                styles.statusPill,
-                virtualCard.status === 'paused' ? styles.statusPaused : styles.statusActive,
-              ]}
-            >
-              <Text style={styles.statusText}>
-                {virtualCard.status === 'paused' ? 'Paused' : 'Active'}
+            <>
+              <Text style={styles.cardPan} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{showPan ? cardPan : cardMasked}</Text>
+              <View style={styles.cardMetaRow}>
+                <Text style={styles.cardMeta}>Exp {cardExpiry}</Text>
+                <Pressable onPress={() => setShowPan((prev) => !prev)}>
+                  <Text style={styles.cardToggle}>
+                    {showPan ? 'Hide card number' : 'Show card number'}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.cardMeta}>Provisioning virtual card...</Text>
+          )}
+        </View>
+
+        <Text style={styles.section}>Transactions ({transactions.length})</Text>
+        {transactions.length === 0 ? (
+          <Text style={styles.empty}>No transactions yet</Text>
+        ) : (
+          transactions.map((tx) => (
+            <View key={tx.id} style={styles.row}>
+              <Text style={styles.rowTitle}>{tx.description ?? 'Payment'}</Text>
+              <Text style={styles.rowMeta}>
+                {formatCents(tx.amount_cents)} · {tx.status}
               </Text>
             </View>
-          ) : null}
-        </View>
-        {virtualCard ? (
-          <>
-            <Text style={styles.cardPan} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{showPan ? cardPan : cardMasked}</Text>
-            <View style={styles.cardMetaRow}>
-              <Text style={styles.cardMeta}>Exp {cardExpiry}</Text>
-              <Pressable onPress={() => setShowPan((prev) => !prev)}>
-                <Text style={styles.cardToggle}>
-                  {showPan ? 'Hide card number' : 'Show card number'}
-                </Text>
-              </Pressable>
-            </View>
-          </>
-        ) : (
-          <Text style={styles.cardMeta}>Provisioning virtual card...</Text>
+          ))
         )}
-      </View>
 
-      <Text style={styles.section}>Transactions ({transactions.length})</Text>
-      {transactions.length === 0 ? (
-        <Text style={styles.empty}>No transactions yet</Text>
-      ) : (
-        transactions.map((tx) => (
-          <View key={tx.id} style={styles.row}>
-            <Text style={styles.rowTitle}>{tx.description ?? 'Payment'}</Text>
-            <Text style={styles.rowMeta}>
-              {formatCents(tx.amount_cents)} · {tx.status}
-            </Text>
-          </View>
-        ))
-      )}
+        {/* TODO: remove test button before production */}
+        <Pressable
+          style={[styles.testBtn, txLoading && styles.testBtnDisabled]}
+          onPress={() => setShowParticipantModal(true)}
+          disabled={txLoading}
+        >
+          <Ionicons name="card-outline" size={18} color={colors.background} />
+          <Text style={styles.testBtnText}>
+            {txLoading ? 'Processing…' : 'Simulate €10 purchase'}
+          </Text>
+        </Pressable>
+        {/* end test button */}
+      </Screen>
 
-    </Screen>
+      <ParticipantSelectModal
+        visible={showParticipantModal}
+        members={members}
+        onConfirm={handleParticipantsConfirmed}
+        onCancel={() => setShowParticipantModal(false)}
+      />
+    </>
   );
 }
 
@@ -172,6 +215,18 @@ const styles = StyleSheet.create({
   rowMeta: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
   empty: { color: colors.textMuted },
   error: { color: colors.danger },
+  testBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: colors.accent,
+  },
+  testBtnDisabled: { opacity: 0.5 },
+  testBtnText: { color: colors.background, fontWeight: '700', fontSize: 15 },
 });
 
 function formatPan(pan: string) {

@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { GroupPayClient } from './client';
 import type {
+  GroupMember,
   Transaction,
   TransactionApproval,
   TransactionParticipant,
@@ -131,6 +132,35 @@ export function subscribeToGroupPendingTransactions(
     },
     'pending',
   );
+}
+
+export function subscribeToGroupMembers(
+  client: GroupPayClient,
+  groupId: string,
+  handlers: RealtimeHandlers<GroupMember>,
+  channelSuffix = 'default',
+): RealtimeChannel {
+  const channelName = `group-members:${groupId}:${channelSuffix}`;
+  removeChannelByName(client, channelName);
+  return client
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'group_members',
+        filter: `group_id=eq.${groupId}`,
+      },
+      (payload) => {
+        const row = payload.new as GroupMember | undefined;
+        const old = payload.old as GroupMember | undefined;
+        if (payload.eventType === 'INSERT' && row) handlers.onInsert?.(row);
+        if (payload.eventType === 'UPDATE' && row) handlers.onUpdate?.(row);
+        if (payload.eventType === 'DELETE' && old) handlers.onDelete?.(old);
+      },
+    )
+    .subscribe();
 }
 
 export function subscribeToTransactionParticipants(

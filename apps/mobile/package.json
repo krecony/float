@@ -5,8 +5,9 @@
   "scripts": {
     "start": "expo start --tunnel --clear",
     "start:no-clear": "expo start --tunnel",
+    "dev": "expo start --tunnel --clear --dev-client",
     "android": "expo start --tunnel --clear --android",
-    "ios": "expo start --ios",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -17,7 +18,9 @@
     "expo": "~55.0.24",
     "expo-clipboard": "^55.0.13",
     "expo-constants": "~55.0.4",
+    "expo-dev-client": "^55.0.34",
     "expo-linking": "~55.0.3",
+    "expo-notifications": "^55.0.23",
     "expo-router": "~55.0.5",
     "expo-status-bar": "~55.0.6",
     "react": "19.2.0",
