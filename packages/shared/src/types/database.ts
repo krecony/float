@@ -6,6 +6,7 @@ import type {
   TransactionApproval,
   TransactionParticipant,
   User,
+  VirtualCard,
 } from './domain';
 
 type TableDef<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
@@ -30,11 +31,13 @@ export interface Database {
       >;
       groups: TableDef<
         Group,
-        Omit<Group, 'id' | 'created_at' | 'balance_cents'> & {
-          id?: string;
-          balance_cents?: number;
-        },
+        Omit<Group, 'id' | 'created_at'> & { id?: string },
         Partial<Omit<Group, 'id' | 'created_at'>>
+      >;
+      virtual_cards: TableDef<
+        VirtualCard,
+        Omit<VirtualCard, 'id' | 'created_at'> & { id?: string },
+        Partial<Omit<VirtualCard, 'id' | 'created_at'>>
       >;
       group_members: TableDef<GroupMember, GroupMember, Partial<GroupMember>>;
       transactions: TableDef<

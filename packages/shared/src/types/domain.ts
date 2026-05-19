@@ -31,8 +31,19 @@ export interface Group {
   id: string;
   name: string;
   invite_code: string;
-  balance_cents: number;
   approval_threshold: number;
+  created_at: string;
+}
+
+export type VirtualCardStatus = 'active' | 'paused';
+
+export interface VirtualCard {
+  id: string;
+  group_id: string;
+  pan: string;
+  exp_month: number;
+  exp_year: number;
+  status: VirtualCardStatus;
   created_at: string;
 }
 
@@ -75,4 +86,5 @@ export interface GroupOverview {
   group: Group;
   members: GroupMemberWithUser[];
   transactions: Transaction[];
+  virtual_card: VirtualCard | null;
 }

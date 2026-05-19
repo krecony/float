@@ -7,3 +7,4 @@ export * from './supabase/realtime';
 export * from './services/users';
 export * from './services/groups';
 export * from './services/transactions';
+export * from './services/virtualCards';

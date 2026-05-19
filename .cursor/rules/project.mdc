@@ -28,17 +28,18 @@ Project structure:
 - flake.nix → package management
 
 Core concept:
-Users create temporary travel groups with shared balances.
+Users create temporary travel groups with a shared virtual debit card.
 Transactions require multi-person approval before execution.
+No balances are held in-app; payments are pay-as-you-go via a processor.
 
 Main demo flow:
 
 1. Users join a travel group
-2. Users deposit fake money
+2. Group receives a virtual card
 3. Merchant terminal creates payment request
 4. Mobile users receive realtime approval request
 5. Required number of users approve
-6. Shared balance updates live across all devices
+6. Transaction status updates live across all devices
 
 DEVELOPMENT:
 All operations should be done inside a nix shell which can be entered by using "nix develop"

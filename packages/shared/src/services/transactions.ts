@@ -1,6 +1,7 @@
 import type { GroupPayClient } from '../supabase/client';
 import type { GroupOverview, Transaction } from '../types/domain';
 import { getGroup, listMembers } from './groups';
+import { getGroupCard } from './virtualCards';
 
 export async function listGroupTransactions(
   client: GroupPayClient,
@@ -91,10 +92,11 @@ export async function fetchGroupOverview(
   const group = await getGroup(client, groupId);
   if (!group) return null;
 
-  const [members, transactions] = await Promise.all([
+  const [members, transactions, virtualCard] = await Promise.all([
     listMembers(client, groupId),
     listGroupTransactions(client, groupId),
+    getGroupCard(client, groupId),
   ]);
 
-  return { group, members, transactions };
+  return { group, members, transactions, virtual_card: virtualCard };
 }

@@ -4,6 +4,7 @@ import type {
   Transaction,
   TransactionApproval,
   TransactionParticipant,
+  VirtualCard,
 } from '../types/domain';
 
 export type RealtimeHandlers<T> = {
@@ -12,9 +13,18 @@ export type RealtimeHandlers<T> = {
   onDelete?: (row: T) => void;
 };
 
-export function unsubscribe(channel: RealtimeChannel | null) {
+/** Remove an existing channel with this name so .on() is never called after subscribe(). */
+function removeChannelByName(client: GroupPayClient, channelName: string) {
+  const topic = `realtime:${channelName}`;
+  const existing = client.getChannels().find((ch) => ch.topic === topic);
+  if (existing) {
+    void client.removeChannel(existing);
+  }
+}
+
+export function unsubscribe(client: GroupPayClient, channel: RealtimeChannel | null) {
   if (channel) {
-    channel.unsubscribe();
+    void client.removeChannel(channel);
   }
 }
 
@@ -22,9 +32,12 @@ export function subscribeToGroupTransactions(
   client: GroupPayClient,
   groupId: string,
   handlers: RealtimeHandlers<Transaction>,
+  channelSuffix = 'default',
 ): RealtimeChannel {
+  const channelName = `group-transactions:${groupId}:${channelSuffix}`;
+  removeChannelByName(client, channelName);
   return client
-    .channel(`group-transactions:${groupId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -44,13 +57,44 @@ export function subscribeToGroupTransactions(
     .subscribe();
 }
 
+export function subscribeToGroupCard(
+  client: GroupPayClient,
+  groupId: string,
+  handlers: RealtimeHandlers<VirtualCard>,
+  channelSuffix = 'default',
+): RealtimeChannel {
+  const channelName = `group-card:${groupId}:${channelSuffix}`;
+  removeChannelByName(client, channelName);
+  return client
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'virtual_cards',
+        filter: `group_id=eq.${groupId}`,
+      },
+      (payload) => {
+        const row = payload.new as VirtualCard | undefined;
+        const old = payload.old as VirtualCard | undefined;
+        if (payload.eventType === 'INSERT' && row) handlers.onInsert?.(row);
+        if (payload.eventType === 'UPDATE' && row) handlers.onUpdate?.(row);
+        if (payload.eventType === 'DELETE' && old) handlers.onDelete?.(old);
+      },
+    )
+    .subscribe();
+}
+
 export function subscribeToTransactionApprovals(
   client: GroupPayClient,
   transactionId: string,
   handlers: RealtimeHandlers<TransactionApproval>,
 ): RealtimeChannel {
+  const channelName = `tx-approvals:${transactionId}`;
+  removeChannelByName(client, channelName);
   return client
-    .channel(`tx-approvals:${transactionId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -75,13 +119,18 @@ export function subscribeToGroupPendingTransactions(
   groupId: string,
   handlers: RealtimeHandlers<Transaction>,
 ): RealtimeChannel {
-  return subscribeToGroupTransactions(client, groupId, {
-    onInsert: (row) => {
-      if (row.status === 'pending') handlers.onInsert?.(row);
+  return subscribeToGroupTransactions(
+    client,
+    groupId,
+    {
+      onInsert: (row) => {
+        if (row.status === 'pending') handlers.onInsert?.(row);
+      },
+      onUpdate: (row) => handlers.onUpdate?.(row),
+      onDelete: handlers.onDelete,
     },
-    onUpdate: (row) => handlers.onUpdate?.(row),
-    onDelete: handlers.onDelete,
-  });
+    'pending',
+  );
 }
 
 export function subscribeToTransactionParticipants(
@@ -89,8 +138,10 @@ export function subscribeToTransactionParticipants(
   transactionId: string,
   handlers: RealtimeHandlers<TransactionParticipant>,
 ): RealtimeChannel {
+  const channelName = `tx-participants:${transactionId}`;
+  removeChannelByName(client, channelName);
   return client
-    .channel(`tx-participants:${transactionId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {

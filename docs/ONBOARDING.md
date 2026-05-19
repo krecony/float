@@ -48,7 +48,7 @@ Point your agent at these files for context:
 
 ### Example prompts
 
-- “Add a deposit flow that increments `groups.balance_cents`” → mention `services/groups.ts` and RLS
+- “Add a pause/resume control for the group virtual card” → mention `services/virtualCards.ts` and RLS
 - “Show participant names on the approvals screen” → join `transaction_participants` with `users`
 - “Fix realtime not updating group overview” → check `subscribeToGroupTransactions` and publication
 

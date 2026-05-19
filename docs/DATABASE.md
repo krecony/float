@@ -1,6 +1,6 @@
 # Database
 
-Schema defined in `supabase/migrations/20250518000000_initial_schema.sql`.
+Schema defined in `supabase/migrations/` (latest includes virtual cards).
 
 ## ER overview
 
@@ -9,6 +9,7 @@ erDiagram
   users ||--o{ payment_methods : has
   users ||--o{ group_members : joins
   groups ||--o{ group_members : has
+  groups ||--|| virtual_cards : issues
   groups ||--o{ transactions : has
   transactions ||--o{ transaction_participants : includes
   transactions ||--o{ transaction_approvals : has
@@ -38,8 +39,18 @@ Simulated saved cards — **never store full PAN/CVV**.
 | Column | Notes |
 |--------|-------|
 | invite_code | Unique 6-char code for joining |
-| balance_cents | Shared demo balance |
 | approval_threshold | Approvals needed (logic TBD) |
+
+### `virtual_cards`
+One virtual debit card per group for the pay-as-you-go flow.
+
+| Column | Notes |
+|--------|-------|
+| group_id | Unique FK → groups |
+| pan | Full card number (demo only) |
+| exp_month | Expiry month |
+| exp_year | Expiry year |
+| status | `active` or `paused` |
 
 ### `group_members`
 M:N between users and groups. `role`: `admin` | `member`.
@@ -73,7 +84,8 @@ Permissive policies for `authenticated` on all tables (hackathon demo). Tighten 
 - `transactions`
 - `transaction_approvals`
 - `transaction_participants`
+- `virtual_cards`
 
 ## Service layer
 
-Apps should call `packages/shared/src/services/*` instead of ad-hoc queries. This is the extension point for balance updates and quorum logic.
+Apps should call `packages/shared/src/services/*` instead of ad-hoc queries. This is the extension point for card status updates and quorum logic.

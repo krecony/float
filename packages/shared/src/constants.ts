@@ -14,4 +14,13 @@ export function generateInviteCode(): string {
   return code;
 }
 
+export function generateVirtualCardPan(): string {
+  const digits = '0123456789';
+  let pan = '4';
+  for (let i = 0; i < 15; i++) {
+    pan += digits[Math.floor(Math.random() * digits.length)];
+  }
+  return pan;
+}
+
 export const APP_NAME = 'GroupPay';

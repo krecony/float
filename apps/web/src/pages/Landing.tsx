@@ -9,11 +9,11 @@ export function Landing() {
       {/* TODO: 3D phones hero — see docs/plan.md */}
       <h1 style={styles.title}>{APP_NAME}</h1>
       <p style={styles.lead}>
-        Collaborative travel wallets with multi-person payment approval. Hackathon demo — simulated
+        Collaborative travel cards with multi-person payment approval. Hackathon demo — simulated
         money only.
       </p>
       <ul style={styles.list}>
-        <li>Shared group balance</li>
+        <li>Group virtual debit card</li>
         <li>Merchant terminal payment requests</li>
         <li>Realtime approvals on mobile</li>
       </ul>

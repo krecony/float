@@ -1,11 +1,11 @@
 import { Tabs } from 'expo-router';
-import { usePendingApprovals } from '../../src/hooks/usePendingApprovals';
+import { GroupDataProvider, useGroupData } from '../../src/providers/GroupDataProvider';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors } from '../../src/theme';
 
-export default function AppLayout() {
+function TabNavigator() {
   const { activeGroupId } = useAuth();
-  const { count } = usePendingApprovals(activeGroupId);
+  const { pendingCount } = useGroupData();
 
   return (
     <Tabs
@@ -17,12 +17,23 @@ export default function AppLayout() {
       }}
     >
       <Tabs.Screen name="group" options={{ title: 'Group' }} />
-      <Tabs.Screen name="wallet" options={{ title: 'Wallet' }} />
       <Tabs.Screen
         name="approvals"
-        options={{ title: 'Approvals', tabBarBadge: count > 0 ? count : undefined }}
+        options={{
+          title: 'Approvals',
+          tabBarBadge: activeGroupId && pendingCount > 0 ? pendingCount : undefined,
+        }}
       />
       <Tabs.Screen name="members" options={{ title: 'Members' }} />
+      <Tabs.Screen name="wallet" options={{ href: null }} />
     </Tabs>
+  );
+}
+
+export default function AppLayout() {
+  return (
+    <GroupDataProvider>
+      <TabNavigator />
+    </GroupDataProvider>
   );
 }

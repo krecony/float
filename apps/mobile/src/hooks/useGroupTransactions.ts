@@ -31,14 +31,19 @@ export function useGroupTransactions(groupId: string | null) {
   useEffect(() => {
     if (!groupId) return;
 
-    const channel = subscribeToGroupTransactions(supabase, groupId, {
-      onInsert: (row) => setTransactions((prev) => [row, ...prev]),
-      onUpdate: (row) =>
-        setTransactions((prev) => prev.map((t) => (t.id === row.id ? row : t))),
-      onDelete: (row) => setTransactions((prev) => prev.filter((t) => t.id !== row.id)),
-    });
+    const channel = subscribeToGroupTransactions(
+      supabase,
+      groupId,
+      {
+        onInsert: (row) => setTransactions((prev) => [row, ...prev]),
+        onUpdate: (row) =>
+          setTransactions((prev) => prev.map((t) => (t.id === row.id ? row : t))),
+        onDelete: (row) => setTransactions((prev) => prev.filter((t) => t.id !== row.id)),
+      },
+      'transactions-hook',
+    );
 
-    return () => unsubscribe(channel);
+    return () => unsubscribe(supabase, channel);
   }, [groupId, supabase]);
 
   return { transactions, loading, refresh: load };

@@ -32,6 +32,7 @@ There is **no custom Node API**. Supabase Auth + PostgREST + Realtime implement 
 |---------|----------------------|
 | group ↔ people M:N | `group_members` |
 | group → transactions | `transactions` |
+| group → virtual card | `virtual_cards` |
 | person card info | `payment_methods` |
 | person legal / ID | `users` + `verify-id` screen |
 | transaction participant subset | `transaction_participants` |
@@ -60,12 +61,12 @@ flowchart TD
 
 ## Realtime
 
-Enabled tables: `transactions`, `transaction_approvals`, `transaction_participants`.
+Enabled tables: `transactions`, `transaction_approvals`, `transaction_participants`, `virtual_cards`.
 
 Helpers live in `packages/shared/src/supabase/realtime.ts`.
 
 ## Extension points
 
-- Approval quorum and balance updates → `services/transactions.ts` + DB triggers (later)
+- Approval quorum and card status updates → `services/transactions.ts` + DB triggers (later)
 - Production RLS → new migration tightening policies
 - Type codegen → `supabase gen types typescript`

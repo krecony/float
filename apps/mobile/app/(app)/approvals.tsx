@@ -1,4 +1,5 @@
 import { approveTransaction, formatCents } from '@grouppay/shared';
+import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../src/components/Button';
 import { Screen } from '../../src/components/Screen';
@@ -8,15 +9,34 @@ import { useSupabase } from '../../src/providers/SupabaseProvider';
 import { colors, spacing } from '../../src/theme';
 
 export default function ApprovalsScreen() {
+  const router = useRouter();
   const supabase = useSupabase();
   const { session, activeGroupId } = useAuth();
   const { pending, loading, refresh } = usePendingApprovals(activeGroupId);
 
   const handleApprove = async (txId: string, approved: boolean) => {
     if (!session?.user.id) return;
-    await approveTransaction(supabase, txId, session.user.id, approved);
-    await refresh();
+    try {
+      await approveTransaction(supabase, txId, session.user.id, approved);
+      await refresh();
+    } catch (e) {
+      console.error('Approval failed', e);
+    }
   };
+
+  if (!activeGroupId) {
+    return (
+      <Screen title="Approvals" subtitle="Payment requests for your group">
+        <Text style={styles.muted}>Join or create a group to see approval requests.</Text>
+        <Button label="Join group" onPress={() => router.push('/(app)/group/join')} />
+        <Button
+          label="Create group"
+          variant="secondary"
+          onPress={() => router.push('/(app)/group/create')}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen title="Approvals" subtitle="Realtime payment requests from the terminal">

@@ -1,6 +1,7 @@
 import { generateInviteCode } from '../constants';
 import type { GroupPayClient } from '../supabase/client';
 import type { Group, GroupMemberWithUser } from '../types/domain';
+import { createGroupCard } from './virtualCards';
 
 export async function createGroup(
   client: GroupPayClient,
@@ -21,6 +22,8 @@ export async function createGroup(
     role: 'admin',
   });
   if (memberError) throw memberError;
+
+  await createGroupCard(client, group.id);
 
   return group;
 }

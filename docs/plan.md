@@ -9,6 +9,7 @@ Implementation status and code mapping: [ARCHITECTURE.md](ARCHITECTURE.md).
         - group
             - people (many to many)
             - transactions (one to many)
+            - virtual card (one per group)
         - person
             - card info
             - legal shit?
@@ -34,6 +35,7 @@ Implementation status and code mapping: [ARCHITECTURE.md](ARCHITECTURE.md).
 - Spending money
 - Notification to accept transaction
 - Group view with all transactions
+- View group virtual card
 
 # Website
 
