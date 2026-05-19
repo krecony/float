@@ -17,7 +17,11 @@ function installAudioUnlock() {
   window.addEventListener("pointerdown", onGesture);
 }
 
-export function useTimelineSounds(progress: number, enabled: boolean) {
+export function useTimelineSounds(
+  progress: number,
+  enabled: boolean,
+  isMobile: boolean
+) {
   const prevProgress = useRef(0);
 
   useEffect(() => {
@@ -28,9 +32,9 @@ export function useTimelineSounds(progress: number, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const prev = prevProgress.current;
-    playStorySoundsBetween(prev, progress);
+    playStorySoundsBetween(prev, progress, isMobile);
     prevProgress.current = progress;
-  }, [progress, enabled]);
+  }, [progress, enabled, isMobile]);
 
   return null;
 }

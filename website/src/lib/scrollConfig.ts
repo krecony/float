@@ -3,6 +3,7 @@
  * Higher = same scroll speed, but the animation takes longer to play through.
  */
 export const ANIMATION_SCROLL_VH = 200;
+export const MOBILE_ANIMATION_SCROLL_VH = 110;
 
 /** Story locks at this progress — plays once per page load */
 export const STORY_COMPLETE = 0.97;
@@ -16,8 +17,9 @@ export const INTRO_HERO_BLEND_PX = 140;
 /** Fade the fixed hero out over this much extra scroll after the story track ends. */
 export const HERO_RELEASE_FADE_PX = 280;
 
-export function getHeroSectionHeight() {
-  return `calc(100vh + ${ANIMATION_SCROLL_VH}vh)`;
+export function getHeroSectionHeight(isMobile = false) {
+  const extraVh = isMobile ? MOBILE_ANIMATION_SCROLL_VH : ANIMATION_SCROLL_VH;
+  return `calc(100vh + ${extraVh}vh)`;
 }
 
 export function mapScrollToStory(raw: number): number {

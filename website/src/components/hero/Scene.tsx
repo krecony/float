@@ -18,9 +18,10 @@ const APPROVERS = [
 
 interface SceneProps {
   timeline: TimelineState;
+  isMobile: boolean;
 }
 
-export function Scene({ timeline }: SceneProps) {
+export function Scene({ timeline, isMobile }: SceneProps) {
   const { phones } = timeline;
   const terminal = phones.terminal.position;
   const payment = phones.payment.position;
@@ -51,30 +52,34 @@ export function Scene({ timeline }: SceneProps) {
         isWide
         screen={<TerminalScreen phase={timeline.phase} />}
       />
-      <Phone3D
-        role="approver1"
-        screen={
-          <MemberApprovalScreen
-            phase={timeline.phase}
-            status={timeline.approverStatuses[0]}
-            memberName={APPROVERS[0].name}
-            initials={APPROVERS[0].initials}
-            accentColor={APPROVERS[0].accent}
-          />
-        }
-      />
-      <Phone3D
-        role="approver2"
-        screen={
-          <MemberApprovalScreen
-            phase={timeline.phase}
-            status={timeline.approverStatuses[1]}
-            memberName={APPROVERS[1].name}
-            initials={APPROVERS[1].initials}
-            accentColor={APPROVERS[1].accent}
-          />
-        }
-      />
+      {!isMobile && (
+        <Phone3D
+          role="approver1"
+          screen={
+            <MemberApprovalScreen
+              phase={timeline.phase}
+              status={timeline.approverStatuses[0]}
+              memberName={APPROVERS[0].name}
+              initials={APPROVERS[0].initials}
+              accentColor={APPROVERS[0].accent}
+            />
+          }
+        />
+      )}
+      {!isMobile && (
+        <Phone3D
+          role="approver2"
+          screen={
+            <MemberApprovalScreen
+              phase={timeline.phase}
+              status={timeline.approverStatuses[1]}
+              memberName={APPROVERS[1].name}
+              initials={APPROVERS[1].initials}
+              accentColor={APPROVERS[1].accent}
+            />
+          }
+        />
+      )}
       <Phone3D
         role="payment"
         screen={

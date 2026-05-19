@@ -116,21 +116,22 @@ export function getPhoneTransforms(
   progress: number,
   isMobile: boolean
 ): Record<PhoneRole, PhoneTransform> {
-  const scaleMul = isMobile ? 0.78 : 1;
+  const scaleMul = isMobile ? 0.8 : 1;
   const globalOpacity = 1;
   const globalScale = 1;
 
   const floatFade = phaseT(progress, 0.12, 0.2);
-  const floatY = floatFade * Math.sin(progress * Math.PI * 3) * 0.035;
+  const floatY =
+    floatFade * Math.sin(progress * Math.PI * 3) * (isMobile ? 0.014 : 0.035);
   const tapT = phaseT(progress, 0.12, 0.28);
   const postTapT = phaseT(progress, 0.28, 0.48);
   const nfcT = phaseT(progress, 0.28, 0.42);
 
   const paymentStart: [number, number, number] = isMobile
-    ? [1.25, 0.3, 0.25]
+    ? [0.46, 0.06, 0.26]
     : [2.05, 0.35, 0.4];
   const paymentEnd: [number, number, number] = isMobile
-    ? [-0.5, 0, 0.5]
+    ? [0.02, 0.02, 0.34]
     : [-0.95, -0.05, 0.6];
 
   const paymentAtTerminal: [number, number, number] = [
@@ -139,7 +140,7 @@ export function getPhoneTransforms(
     lerp(paymentStart[2], paymentEnd[2], tapT),
   ];
   const paymentHoldBack: [number, number, number] = isMobile
-    ? [-0.35, 0.12, 0.42]
+    ? [0.1, 0.04, 0.3]
     : [-0.72, 0.08, 0.52];
 
   const paymentPos: [number, number, number] = [
@@ -149,13 +150,13 @@ export function getPhoneTransforms(
   ];
 
   const paymentRot: [number, number, number] = [
-    lerp(0.1, -0.18, tapT),
-    lerp(-0.38, 0.42, tapT + postTapT * 0.35),
-    lerp(0.04, 0.08, tapT),
+    lerp(isMobile ? 0.08 : 0.1, isMobile ? -0.06 : -0.18, tapT),
+    lerp(isMobile ? -0.18 : -0.38, isMobile ? 0.18 : 0.42, tapT + postTapT * 0.35),
+    lerp(0.04, isMobile ? 0.05 : 0.08, tapT),
   ];
 
   const terminalBase: [number, number, number] = isMobile
-    ? [-1.25, 0.1, 0.15]
+    ? [-0.42, 0.02, 0.12]
     : [-2.05, 0.15, 0.1];
 
   const approverParallax = phaseT(progress, 0.12, 0.5) * 0.12;
@@ -168,37 +169,37 @@ export function getPhoneTransforms(
         terminalBase[2],
       ],
       rotation: [0.06, 0.38 + nfcT * 0.1, 0],
-      scale: 1.08 * scaleMul * globalScale,
+      scale: (isMobile ? 0.88 : 1.08) * scaleMul * globalScale,
       opacity: globalOpacity,
     },
     approver1: {
       position: isMobile
-        ? [0.85, 0.55, -0.75]
+        ? [1.35, 0.62, -1.25]
         : [
             1.15 + approverParallax * 0.1,
             0.5 + floatY,
             -1.05 - approverParallax * 0.2,
           ],
       rotation: [0.05, -0.25, 0.02],
-      scale: 0.86 * scaleMul * globalScale,
-      opacity: globalOpacity,
+      scale: (isMobile ? 0.74 : 0.86) * scaleMul * globalScale,
+      opacity: isMobile ? 0 : globalOpacity,
     },
     approver2: {
       position: isMobile
-        ? [-0.55, 0.45, -0.8]
+        ? [-1.25, 0.48, -1.2]
         : [
             -0.15 - approverParallax * 0.1,
             0.35 + floatY,
             -1.1 - approverParallax * 0.15,
           ],
       rotation: [0.04, 0.2, -0.02],
-      scale: 0.86 * scaleMul * globalScale,
-      opacity: globalOpacity,
+      scale: (isMobile ? 0.74 : 0.86) * scaleMul * globalScale,
+      opacity: isMobile ? 0 : globalOpacity,
     },
     payment: {
       position: paymentPos,
       rotation: paymentRot,
-      scale: 0.96 * scaleMul * globalScale,
+      scale: (isMobile ? 0.78 : 0.96) * scaleMul * globalScale,
       opacity: globalOpacity,
     },
   };

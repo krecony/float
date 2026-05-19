@@ -47,6 +47,12 @@ function milestonesBetween(prev: number, curr: number): SoundMilestone[] {
     .sort((a, b) => MILESTONES[a] - MILESTONES[b]);
 }
 
+function getAllowedMilestones(isMobile: boolean) {
+  return isMobile
+    ? (["tap", "success"] as const)
+    : (["tap", "approve1", "approve2", "success"] as const);
+}
+
 function flushPending() {
   if (!isAudioUnlocked()) return;
   const keys = [...pending].sort((a, b) => MILESTONES[a] - MILESTONES[b]);
@@ -63,12 +69,18 @@ function ensureFlushOnUnlock() {
 }
 
 /** Play milestones crossed between prev and curr; queues if audio not unlocked yet. */
-export function playStorySoundsBetween(prev: number, curr: number) {
+export function playStorySoundsBetween(
+  prev: number,
+  curr: number,
+  isMobile: boolean
+) {
   if (curr <= prev) return;
 
   ensureFlushOnUnlock();
+  const allowed = new Set<SoundMilestone>(getAllowedMilestones(isMobile));
 
   for (const key of milestonesBetween(prev, curr)) {
+    if (!allowed.has(key)) continue;
     if (wasSoundPlayed(key)) continue;
     if (!isAudioUnlocked()) {
       pending.add(key);

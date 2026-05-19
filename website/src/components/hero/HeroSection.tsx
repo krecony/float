@@ -52,7 +52,10 @@ export function HeroSection({
             <Canvas
               className="!block !h-full !w-full touch-none"
               style={{ display: "block", width: "100%", height: "100%" }}
-              camera={{ position: [0, 0.15, 5], fov: 42 }}
+              camera={{
+                position: isMobile ? [0, 0.06, 4.75] : [0, 0.15, 5],
+                fov: isMobile ? 50 : 42,
+              }}
               dpr={1}
               gl={{
                 antialias: true,
@@ -61,7 +64,7 @@ export function HeroSection({
               }}
               onCreated={onCanvasCreated}
             >
-              <Scene timeline={timeline} />
+              <Scene timeline={timeline} isMobile={isMobile} />
             </Canvas>
           </Suspense>
         </div>

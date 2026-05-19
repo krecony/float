@@ -18,7 +18,7 @@ export function LandingPage() {
   const [useFallback, setUseFallback] = useState(false);
   const [ready, setReady] = useState(false);
 
-  useTimelineSounds(progress, ready && unveiled);
+  useTimelineSounds(progress, ready && unveiled, isMobile);
 
   useLayoutEffect(() => {
     if ("scrollRestoration" in history) {
@@ -86,7 +86,7 @@ export function LandingPage() {
         ref={trackRef}
         aria-hidden
         className="pointer-events-none"
-        style={{ height: getHeroSectionHeight() }}
+        style={{ height: getHeroSectionHeight(isMobile) }}
       />
 
       {/* Fixed viewport canvas — never unsticks or reflows */}

@@ -67,7 +67,9 @@ export function CssFallback({ progress, isMobile }: CssFallbackProps) {
     >
       <AmbientGradients />
 
-      <div className="relative flex max-w-[95vw] flex-wrap items-center justify-center gap-2 px-2 md:gap-4">
+      <div
+        className="relative flex max-w-[95vw] flex-wrap items-center justify-center gap-2 px-2 md:gap-4"
+      >
         <PhoneFrame
           className="z-10"
           style={toStyle("terminal")}
@@ -76,33 +78,37 @@ export function CssFallback({ progress, isMobile }: CssFallbackProps) {
           <TerminalScreen phase={phase} />
         </PhoneFrame>
 
-        <PhoneFrame
-          className="z-[5]"
-          style={toStyle("approver1")}
-          highlight={phoneHighlights.approver1}
-        >
-          <MemberApprovalScreen
-            phase={phase}
-            status={timeline.approverStatuses[0]}
-            memberName={APPROVERS[0].name}
-            initials={APPROVERS[0].initials}
-            accentColor={APPROVERS[0].accent}
-          />
-        </PhoneFrame>
+        {!isMobile && (
+          <PhoneFrame
+            className="z-[5]"
+            style={toStyle("approver1")}
+            highlight={phoneHighlights.approver1}
+          >
+            <MemberApprovalScreen
+              phase={phase}
+              status={timeline.approverStatuses[0]}
+              memberName={APPROVERS[0].name}
+              initials={APPROVERS[0].initials}
+              accentColor={APPROVERS[0].accent}
+            />
+          </PhoneFrame>
+        )}
 
-        <PhoneFrame
-          className="z-[5]"
-          style={toStyle("approver2")}
-          highlight={phoneHighlights.approver2}
-        >
-          <MemberApprovalScreen
-            phase={phase}
-            status={timeline.approverStatuses[1]}
-            memberName={APPROVERS[1].name}
-            initials={APPROVERS[1].initials}
-            accentColor={APPROVERS[1].accent}
-          />
-        </PhoneFrame>
+        {!isMobile && (
+          <PhoneFrame
+            className="z-[5]"
+            style={toStyle("approver2")}
+            highlight={phoneHighlights.approver2}
+          >
+            <MemberApprovalScreen
+              phase={phase}
+              status={timeline.approverStatuses[1]}
+              memberName={APPROVERS[1].name}
+              initials={APPROVERS[1].initials}
+              accentColor={APPROVERS[1].accent}
+            />
+          </PhoneFrame>
+        )}
 
         <PhoneFrame
           className="z-20"
@@ -116,7 +122,11 @@ export function CssFallback({ progress, isMobile }: CssFallbackProps) {
       {timeline.showNfcPulse && (
         <div
           className="pointer-events-none absolute h-20 w-20 animate-ping rounded-full border-2 border-cyan-400/60"
-          style={{ left: "42%", top: "46%" }}
+          style={
+            isMobile
+              ? { left: "50%", top: "48%", transform: "translate(-50%, -50%)" }
+              : { left: "42%", top: "46%" }
+          }
         />
       )}
     </div>
