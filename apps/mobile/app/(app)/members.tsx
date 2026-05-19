@@ -1,13 +1,10 @@
-import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { Button } from '../../src/components/Button';
 import { Screen } from '../../src/components/Screen';
 import { useGroupOverview } from '../../src/hooks/useGroupOverview';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, spacing } from '../../src/theme';
 
 export default function MembersScreen() {
-  const router = useRouter();
   const { activeGroupId } = useAuth();
   const { overview, loading } = useGroupOverview(activeGroupId);
 
@@ -27,7 +24,6 @@ export default function MembersScreen() {
           </View>
         </View>
       ))}
-      <Button label="Switch group" variant="secondary" onPress={() => router.push('/(app)/group/join')} />
     </Screen>
   );
 }

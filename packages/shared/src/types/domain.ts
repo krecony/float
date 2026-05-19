@@ -6,6 +6,7 @@ export type TransactionStatus =
 
 export interface User {
   id: string;
+  login_name: string | null;
   display_name: string | null;
   legal_name: string | null;
   date_of_birth: string | null;
@@ -19,6 +20,7 @@ export interface PaymentMethod {
   id: string;
   user_id: string;
   label: string;
+  pan: string;
   last_four: string;
   brand: string;
   exp_month: number;

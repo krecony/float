@@ -37,7 +37,7 @@ There is **no custom Node API**. Supabase Auth + PostgREST + Realtime implement 
 | person legal / ID | `users` + `verify-id` screen |
 | transaction participant subset | `transaction_participants` |
 | API: user / group / join / transaction | `packages/shared/src/services/*` |
-| Create account | `login` + anonymous auth |
+| Create account | `login` — name → email `@grouppay.demo` + demo password |
 | Verify ID | `verify-id` |
 | Create / join group | `group/create`, `group/join` |
 | Spend / approve | terminal + `approvals` tab |
@@ -48,14 +48,20 @@ There is **no custom Node API**. Supabase Auth + PostgREST + Realtime implement 
 
 ```mermaid
 flowchart TD
-  Login --> Verified{id_verified?}
+  Login[Name login / sign-up] --> Verified{id_verified?}
   Verified -->|no| VerifyId
   VerifyId --> PaymentMethod
-  PaymentMethod --> HasGroup{active group?}
-  Verified -->|yes| HasGroup
-  HasGroup -->|no| JoinOrCreate
-  HasGroup -->|yes| Tabs[Group / Wallet / Approvals / Members]
+  PaymentMethod --> ListGroups[listUserGroups]
+  Verified -->|yes| ListGroups
+  ListGroups --> ActiveId[activeGroupId in AsyncStorage]
+  ActiveId -->|none, has groups| PickFirst[auto-select first group]
+  ActiveId -->|none, no groups| JoinOrCreate
+  PickFirst --> Tabs[Group / Approvals / Members]
+  ActiveId -->|valid member| Tabs
+  Switcher[GroupSwitcher] --> ActiveId
 ```
+
+**Multi-group:** memberships live in `group_members`; only `activeGroupId` (local) chooses which group the UI loads. Creating a group does not remove other memberships.
 
 **Approvals “notifications”:** `usePendingApprovals` subscribes to realtime `transactions` inserts/updates; tab badge shows pending count. Push notifications are a later addition.
 

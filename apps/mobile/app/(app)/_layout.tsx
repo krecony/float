@@ -1,10 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { GroupDataProvider, useGroupData } from '../../src/providers/GroupDataProvider';
-import { useAuth } from '../../src/providers/AuthProvider';
 import { colors } from '../../src/theme';
 
 function TabNavigator() {
-  const { activeGroupId } = useAuth();
   const { pendingCount } = useGroupData();
 
   return (
@@ -16,15 +15,34 @@ function TabNavigator() {
         tabBarInactiveTintColor: colors.textMuted,
       }}
     >
-      <Tabs.Screen name="group" options={{ title: 'Group' }} />
       <Tabs.Screen
-        name="approvals"
+        name="group"
         options={{
-          title: 'Approvals',
-          tabBarBadge: activeGroupId && pendingCount > 0 ? pendingCount : undefined,
+          title: 'Group',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'card' : 'card-outline'} size={22} color={color} />
+          ),
         }}
       />
-      <Tabs.Screen name="members" options={{ title: 'Members' }} />
+      <Tabs.Screen
+        name="members"
+        options={{
+          title: 'Members',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'people' : 'people-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: 'Account',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen name="approvals" options={{ href: null }} />
       <Tabs.Screen name="wallet" options={{ href: null }} />
     </Tabs>
   );

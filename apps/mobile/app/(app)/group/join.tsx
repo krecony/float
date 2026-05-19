@@ -12,7 +12,7 @@ import { colors } from '../../../src/theme';
 export default function JoinGroupScreen() {
   const router = useRouter();
   const supabase = useSupabase();
-  const { session, setActiveGroupId } = useAuth();
+  const { session, setActiveGroupId, refreshUserGroups } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +23,7 @@ export default function JoinGroupScreen() {
     setError(null);
     try {
       const group = await joinGroupByInviteCode(supabase, session.user.id, code.trim());
+      await refreshUserGroups();
       await setActiveGroupId(group.id);
       router.replace('/(app)/group');
     } catch (e) {

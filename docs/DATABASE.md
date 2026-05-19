@@ -25,6 +25,7 @@ Profile row per `auth.users`. Legal fields are **demo KYC stubs** only.
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid PK | FK → auth.users |
+| login_name | citext unique | Demo login key (case-insensitive) |
 | display_name | text | |
 | legal_name | text | From ID verification |
 | date_of_birth | date | |
@@ -33,7 +34,7 @@ Profile row per `auth.users`. Legal fields are **demo KYC stubs** only.
 | id_verified_at | timestamptz | |
 
 ### `payment_methods`
-Simulated saved cards — **never store full PAN/CVV**.
+Simulated saved cards for demo KYC onboarding. **`pan`** holds the full card number in this hackathon build (same pattern as `virtual_cards.pan`) — **not PCI-compliant**; do not use in production.
 
 ### `groups`
 | Column | Notes |

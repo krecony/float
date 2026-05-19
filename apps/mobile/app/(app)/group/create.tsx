@@ -12,7 +12,7 @@ import { colors } from '../../../src/theme';
 export default function CreateGroupScreen() {
   const router = useRouter();
   const supabase = useSupabase();
-  const { session, setActiveGroupId } = useAuth();
+  const { session, setActiveGroupId, refreshUserGroups } = useAuth();
   const [name, setName] = useState('');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,7 @@ export default function CreateGroupScreen() {
     setLoading(true);
     try {
       const group = await createGroup(supabase, session.user.id, name.trim());
+      await refreshUserGroups();
       await setActiveGroupId(group.id);
       setInviteCode(group.invite_code);
     } finally {
@@ -34,6 +35,9 @@ export default function CreateGroupScreen() {
       <Screen title="Group created">
         <Text style={styles.code}>Invite code: {inviteCode}</Text>
         <Text style={styles.hint}>Share this code so others can join.</Text>
+        <Text style={styles.hint}>
+          Your other groups are still available — tap Groups in the top-right corner to switch.
+        </Text>
         <Button label="Open group" onPress={() => router.replace('/(app)/group')} />
       </Screen>
     );

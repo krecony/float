@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../../src/components/Button';
+import { GroupSwitcher } from '../../../src/components/GroupSwitcher';
 import { Screen } from '../../../src/components/Screen';
 import { useGroupOverview } from '../../../src/hooks/useGroupOverview';
 import { useAuth } from '../../../src/providers/AuthProvider';
@@ -40,7 +41,7 @@ export default function GroupOverviewScreen() {
     );
   }
 
-  const { group, members, transactions } = overview;
+  const { group, transactions } = overview;
   const virtualCard = overview.virtual_card;
 
   const cardPan = virtualCard ? formatPan(virtualCard.pan) : '';
@@ -50,7 +51,11 @@ export default function GroupOverviewScreen() {
     : '';
 
   return (
-    <Screen title={group.name} subtitle={`Invite: ${group.invite_code}`}>
+    <Screen
+      headerRight={<GroupSwitcher />}
+      title={group.name}
+      subtitle={`Invite: ${group.invite_code}`}
+    >
       <View style={styles.cardPanel}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardLabel}>Group virtual card</Text>
@@ -84,14 +89,6 @@ export default function GroupOverviewScreen() {
         )}
       </View>
 
-      <Text style={styles.section}>Members ({members.length})</Text>
-      {members.map((m) => (
-        <View key={m.user_id} style={styles.row}>
-          <Text style={styles.rowTitle}>{m.users?.display_name ?? m.users?.legal_name ?? 'Member'}</Text>
-          <Text style={styles.rowMeta}>{m.role}</Text>
-        </View>
-      ))}
-
       <Text style={styles.section}>Transactions ({transactions.length})</Text>
       {transactions.length === 0 ? (
         <Text style={styles.empty}>No transactions yet</Text>
@@ -106,7 +103,6 @@ export default function GroupOverviewScreen() {
         ))
       )}
 
-      <Button label="Create group" variant="secondary" onPress={() => router.push('/(app)/group/create')} />
     </Screen>
   );
 }

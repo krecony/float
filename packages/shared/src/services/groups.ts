@@ -92,3 +92,14 @@ export async function listUserGroups(
     .map((row) => (row as unknown as { groups: Group | null }).groups)
     .filter((g): g is Group => g != null);
 }
+
+/** Keep stored active group if user is still a member; otherwise first group or null. */
+export function resolveActiveGroupId(
+  groups: Group[],
+  storedGroupId: string | null,
+): string | null {
+  if (storedGroupId && groups.some((g) => g.id === storedGroupId)) {
+    return storedGroupId;
+  }
+  return groups[0]?.id ?? null;
+}

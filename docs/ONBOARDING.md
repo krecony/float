@@ -18,6 +18,16 @@ supabase link    # once
 supabase db push
 ```
 
+## Supabase Auth (demo name login)
+
+Mobile uses **Email** auth with synthetic addresses (`your.name@grouppay.demo`) and a shared demo password from `.env`:
+
+1. Supabase Dashboard → **Authentication** → **Providers** → enable **Email**.
+2. For hackathon demos, disable **Confirm email** (or enable auto-confirm) so sign-up returns a session immediately.
+3. Set `EXPO_PUBLIC_DEMO_AUTH_PASSWORD` in `.env` (default `grouppay-demo` if unset).
+
+**Login rules:** display name is trimmed, lowercased, spaces collapsed (e.g. `Jane Doe` → `jane doe`). Same name always maps to the same account. No password field in the app — the demo password is internal only.
+
 ## Run apps
 
 ```bash

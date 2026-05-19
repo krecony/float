@@ -1,4 +1,5 @@
 export * from './constants';
+export * from './auth/demoLogin';
 export * from './env';
 export * from './types/domain';
 export * from './types/database';
