@@ -1,5 +1,5 @@
 import type { GroupPayClient } from '../supabase/client';
-import type { GroupOverview, Transaction } from '../types/domain';
+import type { GroupOverview, Transaction, TransactionStatus } from '../types/domain';
 import { getGroup, listMembers } from './groups';
 import { getGroupCard } from './virtualCards';
 
@@ -109,14 +109,67 @@ export async function approveTransaction(
   approved: boolean,
 ): Promise<void> {
   const { error } = await client.from('transaction_approvals').upsert(
-    {
-      transaction_id: transactionId,
-      user_id: userId,
-      approved,
-    },
+    { transaction_id: transactionId, user_id: userId, approved },
     { onConflict: 'transaction_id,user_id' },
   );
   if (error) throw error;
+  await finalizeTransactionIfComplete(client, transactionId);
+}
+
+/** Check if all participants have voted and resolve the transaction status. */
+async function finalizeTransactionIfComplete(
+  client: GroupPayClient,
+  transactionId: string,
+): Promise<void> {
+  const [{ data: participants }, { data: approvals }] = await Promise.all([
+    client.from('transaction_participants').select('user_id').eq('transaction_id', transactionId),
+    client
+      .from('transaction_approvals')
+      .select('user_id, approved')
+      .eq('transaction_id', transactionId),
+  ]);
+
+  if (!participants?.length || !approvals) return;
+
+  const allVoted = participants.every((p) => approvals.some((a) => a.user_id === p.user_id));
+  if (!allVoted) return;
+
+  const newStatus: TransactionStatus = approvals.some((a) => !a.approved)
+    ? 'rejected'
+    : 'completed';
+
+  await client.from('transactions').update({ status: newStatus }).eq('id', transactionId);
+}
+
+export interface TransactionWithApprovalState extends Transaction {
+  isParticipant: boolean;
+  myApproval: boolean | null;
+  approvalCount: number;
+  participantCount: number;
+}
+
+/** Load participant + approval state for a single transaction for the given user. */
+export async function getTransactionApprovalState(
+  client: GroupPayClient,
+  transactionId: string,
+  userId: string,
+): Promise<{ isParticipant: boolean; myApproval: boolean | null; approvalCount: number; participantCount: number }> {
+  const [{ data: participants }, { data: approvals }] = await Promise.all([
+    client.from('transaction_participants').select('user_id').eq('transaction_id', transactionId),
+    client
+      .from('transaction_approvals')
+      .select('user_id, approved')
+      .eq('transaction_id', transactionId),
+  ]);
+
+  const parts = participants ?? [];
+  const apprs = approvals ?? [];
+  const isParticipant = parts.some((p) => p.user_id === userId);
+  const myApprovalRow = apprs.find((a) => a.user_id === userId);
+  const myApproval = myApprovalRow ? myApprovalRow.approved : null;
+  const approvalCount = apprs.filter((a) => a.approved).length;
+
+  return { isParticipant, myApproval, approvalCount, participantCount: parts.length };
 }
 
 export async function fetchGroupOverview(

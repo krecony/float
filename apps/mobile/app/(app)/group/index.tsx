@@ -1,8 +1,15 @@
-import { formatCents } from '@grouppay/shared';
+import {
+  approveTransaction,
+  formatCents,
+  getTransactionApprovalState,
+  subscribeToTransactionApprovals,
+  unsubscribe,
+  type Transaction,
+} from '@grouppay/shared';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../../src/components/Button';
 import { GroupSwitcher } from '../../../src/components/GroupSwitcher';
@@ -135,12 +142,19 @@ export default function GroupOverviewScreen() {
           <Text style={styles.empty}>No transactions yet</Text>
         ) : (
           transactions.map((tx) => (
-            <View key={tx.id} style={styles.row}>
-              <Text style={styles.rowTitle}>{tx.description ?? 'Payment'}</Text>
-              <Text style={styles.rowMeta}>
-                {formatCents(tx.amount_cents)}
-              </Text>
-            </View>
+            tx.status === 'pending' ? (
+              <ApprovalCard key={tx.id} tx={tx} userId={session?.user.id ?? ''} />
+            ) : (
+              <View key={tx.id} style={[styles.row, tx.status === 'completed' && styles.rowCompleted, tx.status === 'rejected' && styles.rowRejected]}>
+                <View style={styles.rowTop}>
+                  <Text style={styles.rowTitle}>{tx.description || 'Payment'}</Text>
+                  <Text style={styles.rowAmount}>{formatCents(tx.amount_cents)}</Text>
+                </View>
+                <Text style={[styles.rowStatus, tx.status === 'completed' ? styles.statusCompleted : styles.statusRejected]}>
+                  {tx.status === 'completed' ? '✓ Approved' : '✕ Rejected'}
+                </Text>
+              </View>
+            )
           ))
         )}
 
@@ -217,9 +231,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.md,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     marginTop: spacing.sm,
+    gap: 4,
   },
-  rowTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  rowCompleted: { borderColor: 'rgba(61,255,168,0.3)' },
+  rowRejected: { borderColor: 'rgba(255,107,107,0.3)' },
+  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rowTitle: { color: colors.text, fontSize: 15, fontWeight: '600', flex: 1 },
+  rowAmount: { color: colors.text, fontWeight: '700', fontSize: 15 },
+  rowStatus: { fontSize: 12 },
+  statusCompleted: { color: colors.accent },
+  statusRejected: { color: colors.danger },
   rowMeta: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
   empty: { color: colors.textMuted },
   error: { color: colors.danger },
@@ -249,6 +273,131 @@ const styles = StyleSheet.create({
   testBtnDisabled: { opacity: 0.5 },
   testBtnText: { color: colors.textMuted, fontWeight: '600', fontSize: 14 },
 });
+
+// ── Approval card ───────────────────────────────────────────────────────────
+
+function ApprovalCard({ tx, userId }: { tx: Transaction; userId: string }) {
+  const supabase = useSupabase();
+  const [isParticipant, setIsParticipant] = useState(false);
+  const [myApproval, setMyApproval] = useState<boolean | null>(null);
+  const [approvalCount, setApprovalCount] = useState(0);
+  const [participantCount, setParticipantCount] = useState(0);
+  const [voting, setVoting] = useState(false);
+
+  async function loadState() {
+    const state = await getTransactionApprovalState(supabase, tx.id, userId);
+    setIsParticipant(state.isParticipant);
+    setMyApproval(state.myApproval);
+    setApprovalCount(state.approvalCount);
+    setParticipantCount(state.participantCount);
+  }
+
+  useEffect(() => {
+    if (!userId) return;
+    void loadState();
+
+    const channel = subscribeToTransactionApprovals(supabase, tx.id, {
+      onInsert: () => void loadState(),
+      onUpdate: () => void loadState(),
+    });
+
+    return () => {
+      unsubscribe(supabase, channel);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tx.id, userId]);
+
+  const vote = async (approved: boolean) => {
+    if (voting || myApproval !== null) return;
+    setVoting(true);
+    try {
+      await approveTransaction(supabase, tx.id, userId, approved);
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  return (
+    <View style={[approvalStyles.card, isParticipant && myApproval === null && approvalStyles.cardPending]}>
+      <View style={approvalStyles.top}>
+        <View style={{ flex: 1 }}>
+          <Text style={approvalStyles.desc}>{tx.description || 'Payment'}</Text>
+          {participantCount > 0 && (
+            <Text style={approvalStyles.progress}>
+              {approvalCount}/{participantCount} approved
+            </Text>
+          )}
+        </View>
+        <Text style={approvalStyles.amount}>{formatCents(tx.amount_cents)}</Text>
+      </View>
+
+      {isParticipant && myApproval === null && (
+        <View style={approvalStyles.buttons}>
+          <Pressable
+            style={[approvalStyles.btn, approvalStyles.btnReject, voting && approvalStyles.btnDisabled]}
+            onPress={() => vote(false)}
+            disabled={voting}
+          >
+            <Text style={approvalStyles.btnRejectText}>✕ Reject</Text>
+          </Pressable>
+          <Pressable
+            style={[approvalStyles.btn, approvalStyles.btnApprove, voting && approvalStyles.btnDisabled]}
+            onPress={() => vote(true)}
+            disabled={voting}
+          >
+            {voting ? (
+              <ActivityIndicator color={colors.background} size="small" />
+            ) : (
+              <Text style={approvalStyles.btnApproveText}>✓ Approve</Text>
+            )}
+          </Pressable>
+        </View>
+      )}
+
+      {isParticipant && myApproval !== null && (
+        <Text style={[approvalStyles.voted, myApproval ? approvalStyles.votedApproved : approvalStyles.votedRejected]}>
+          {myApproval ? 'You approved · waiting for others' : 'You rejected this payment'}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const approvalStyles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  cardPending: { borderColor: colors.warning },
+  top: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  desc: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  progress: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  amount: { color: colors.accent, fontWeight: '700', fontSize: 16 },
+  buttons: { flexDirection: 'row', gap: spacing.sm },
+  btn: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  btnApprove: { backgroundColor: colors.accent },
+  btnReject: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.danger },
+  btnDisabled: { opacity: 0.5 },
+  btnApproveText: { color: colors.background, fontWeight: '700', fontSize: 14 },
+  btnRejectText: { color: colors.danger, fontWeight: '700', fontSize: 14 },
+  voted: { fontSize: 13, textAlign: 'center', paddingVertical: spacing.xs },
+  votedApproved: { color: colors.accent },
+  votedRejected: { color: colors.danger },
+});
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatPan(pan: string) {
   return pan.replace(/(\d{4})(?=\d)/g, '$1 ');

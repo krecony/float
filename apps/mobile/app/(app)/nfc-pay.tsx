@@ -1,10 +1,16 @@
+/**
+ * NFC Pay — payer side
+ *
+ * Flow:
+ * 1. HCE starts broadcasting GP|groupId|userId
+ * 2. Broadcast channel subscribed for this user
+ * 3. Terminal reads NFC → sends CHARGE_REQUEST (amountCents)
+ * 4. We receive CHARGE_REQUEST → show description + participant selection
+ * 5. User confirms → send SPLIT_CONFIRMED (description, participantIds)
+ * 6. Terminal creates the transaction → participants see approval prompts
+ */
 import {
   formatCents,
-  subscribeToGroupTransactions,
-  unsubscribe,
-  updateTransactionDescription,
-  updateTransactionParticipants,
-  type Transaction,
 } from '@grouppay/shared';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -28,7 +34,7 @@ import { useGroupData } from '../../src/providers/GroupDataProvider';
 import { useSupabase } from '../../src/providers/SupabaseProvider';
 import { colors, spacing, typography } from '../../src/theme';
 
-type Status = 'waiting' | 'read' | 'selecting' | 'done' | 'error' | 'unsupported';
+type Status = 'waiting' | 'read' | 'selecting' | 'confirming' | 'done' | 'error' | 'unsupported';
 
 export default function NfcPayScreen() {
   const router = useRouter();
@@ -38,16 +44,16 @@ export default function NfcPayScreen() {
 
   const [status, setStatus] = useState<Status>('waiting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
+  const [amountCents, setAmountCents] = useState(0);
   const [description, setDescription] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
-  const hceSessionRef = useRef<HCESession | null>(null);
   const statusRef = useRef<Status>('waiting');
   statusRef.current = status;
+  const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const members = overview?.members ?? [];
 
@@ -59,30 +65,20 @@ export default function NfcPayScreen() {
     }
     pulseLoop.current = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.22,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 1.22, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
     pulseLoop.current.start();
     return () => pulseLoop.current?.stop();
   }, [status, pulseAnim]);
 
-  // HCE session — fully reset on every screen focus, cleaned up on blur
+  // Full reset on every screen focus
   useFocusEffect(
     useCallback(() => {
       setStatus('waiting');
       setErrorMsg(null);
-      setCurrentTransaction(null);
+      setAmountCents(0);
       setDescription('');
       pulseAnim.setValue(1);
 
@@ -96,12 +92,29 @@ export default function NfcPayScreen() {
         return;
       }
 
+      const userId = session.user.id;
       let active = true;
       let removeReadListener: (() => void) | undefined;
 
+      // Subscribe to broadcast channel BEFORE starting HCE,
+      // so we're ready to receive CHARGE_REQUEST the instant the terminal reads the tag.
+      const channelName = `nfc-session-${activeGroupId}-${userId}`;
+      const broadcastChannel = supabase.channel(channelName);
+      broadcastChannelRef.current = broadcastChannel;
+
+      broadcastChannel
+        .on('broadcast', { event: 'CHARGE_REQUEST' }, (payload: { payload: { amountCents: number } }) => {
+          if (!active || statusRef.current !== 'read') return;
+          setAmountCents(payload.payload.amountCents);
+          // Default all members as selected
+          setSelectedIds(new Set(members.map((m) => m.user_id)));
+          setStatus('selecting');
+        })
+        .subscribe();
+
       async function startHce() {
         try {
-          const payload = `GP|${activeGroupId}|${session!.user.id}`;
+          const payload = `GP|${activeGroupId}|${userId}`;
           const tag = new NFCTagType4({
             type: NFCTagType4NDEFContentType.Text,
             content: payload,
@@ -111,7 +124,6 @@ export default function NfcPayScreen() {
           await hce.setEnabled(false);
           hce.setApplication(tag);
           await hce.setEnabled(true);
-          hceSessionRef.current = hce;
 
           removeReadListener = hce.on(HCESession.Events.HCE_STATE_READ, () => {
             if (!active || statusRef.current !== 'waiting') return;
@@ -130,36 +142,15 @@ export default function NfcPayScreen() {
       return () => {
         active = false;
         removeReadListener?.();
-        hceSessionRef.current?.setEnabled(false).catch(() => {});
+        HCESession.getInstance()
+          .then((hce) => hce.setEnabled(false))
+          .catch(() => {});
+        supabase.removeChannel(broadcastChannel);
+        broadcastChannelRef.current = null;
       };
-    }, [activeGroupId, session, pulseAnim])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeGroupId, session?.user.id])
   );
-
-  // After tap: wait for the terminal to create the transaction, then show
-  // the description input + participant selection form
-  useEffect(() => {
-    if (status !== 'read' || !activeGroupId) return;
-
-    const channel = subscribeToGroupTransactions(
-      supabase,
-      activeGroupId,
-      {
-        onInsert: (tx) => {
-          if (statusRef.current !== 'read') return;
-          setCurrentTransaction(tx);
-          setSelectedIds(new Set(members.map((m) => m.user_id)));
-          setStatus('selecting');
-        },
-      },
-      'nfc-pay-watcher',
-    );
-
-    return () => {
-      unsubscribe(supabase, channel);
-    };
-  // members is intentionally excluded — we snapshot it when the modal opens
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, activeGroupId, supabase]);
 
   const toggleMember = (id: string) => {
     setSelectedIds((prev) => {
@@ -171,24 +162,27 @@ export default function NfcPayScreen() {
   };
 
   const handleConfirm = async () => {
-    if (!currentTransaction) return;
+    if (!broadcastChannelRef.current || selectedIds.size === 0) return;
     setConfirming(true);
     try {
-      await Promise.all([
-        updateTransactionDescription(supabase, currentTransaction.id, description.trim() || 'Purchase'),
-        updateTransactionParticipants(supabase, currentTransaction.id, Array.from(selectedIds)),
-      ]);
+      await broadcastChannelRef.current.send({
+        type: 'broadcast',
+        event: 'SPLIT_CONFIRMED',
+        payload: {
+          description: description.trim() || 'Purchase',
+          participantIds: Array.from(selectedIds),
+        },
+      });
       setStatus('done');
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Failed to confirm payment');
-      setStatus('error');
+      setErrorMsg(e instanceof Error ? e.message : 'Failed to send confirmation');
     } finally {
       setConfirming(false);
     }
   };
 
   // ── Participant selection / description form ────────────────────────────
-  if (status === 'selecting' && currentTransaction) {
+  if (status === 'selecting') {
     return (
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView
@@ -197,13 +191,9 @@ export default function NfcPayScreen() {
         >
           <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
             <View style={styles.formHeader}>
-              <Pressable onPress={() => setStatus('read')} style={styles.backBtn}>
-                <Text style={styles.backText}>← Back</Text>
-              </Pressable>
               <Text style={styles.formTitle}>Confirm payment</Text>
-              <Text style={styles.formAmount}>
-                {formatCents(currentTransaction.amount_cents)}
-              </Text>
+              <Text style={styles.formAmount}>{formatCents(amountCents)}</Text>
+              <Text style={styles.formSub}>Choose who splits this payment and add a label.</Text>
             </View>
 
             <View style={styles.field}>
@@ -252,7 +242,7 @@ export default function NfcPayScreen() {
                 <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.confirmBtnText}>
-                  Confirm · {formatCents(currentTransaction.amount_cents)}
+                  Confirm · {formatCents(amountCents)}
                 </Text>
               )}
             </Pressable>
@@ -275,9 +265,7 @@ export default function NfcPayScreen() {
 
         <View style={styles.nfcArea}>
           {status === 'waiting' ? (
-            <Animated.View
-              style={[styles.ring, styles.ringPulse, { transform: [{ scale: pulseAnim }] }]}
-            />
+            <Animated.View style={[styles.ring, styles.ringPulse, { transform: [{ scale: pulseAnim }] }]} />
           ) : null}
           <View style={[styles.ring, styles.ringInner]} />
           <View
@@ -305,18 +293,18 @@ export default function NfcPayScreen() {
 
         {status === 'read' && (
           <View style={[styles.messageBox, styles.messageBoxRead]}>
-            <Text style={[styles.mainText, styles.accentText]}>Sent to terminal!</Text>
+            <Text style={[styles.mainText, styles.accentText]}>Connected to terminal!</Text>
             <Text style={styles.subText}>
               Waiting for the merchant to confirm the amount…
             </Text>
           </View>
         )}
 
-        {status === 'done' && currentTransaction && (
+        {status === 'done' && (
           <View style={[styles.messageBox, styles.messageBoxDone]}>
-            <Text style={[styles.mainText, styles.accentText]}>Payment sent!</Text>
+            <Text style={[styles.mainText, styles.accentText]}>Sent!</Text>
             <Text style={styles.subText}>
-              {formatCents(currentTransaction.amount_cents)} · group members have been notified.
+              {formatCents(amountCents)} · The selected members will receive an approval request.
             </Text>
             <Pressable style={styles.doneBtn} onPress={() => router.back()}>
               <Text style={styles.doneBtnText}>Done</Text>
@@ -350,18 +338,14 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
 
-  // ── Participant/description form ──
+  // Form
   formScroll: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xl * 2 },
   formHeader: { gap: spacing.xs, marginBottom: spacing.sm },
   formTitle: { ...typography.title, color: colors.text },
   formAmount: { fontSize: 32, fontWeight: '700', color: colors.accent },
+  formSub: { ...typography.body, color: colors.textMuted, lineHeight: 20 },
   field: { gap: spacing.sm },
-  fieldLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
+  fieldLabel: { ...typography.caption, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
   descInput: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -384,13 +368,9 @@ const styles = StyleSheet.create({
   },
   memberRowActive: { borderColor: colors.accentDim },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 2, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
   },
   checkboxActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   checkmark: { color: colors.background, fontSize: 13, fontWeight: '700' },
@@ -408,7 +388,7 @@ const styles = StyleSheet.create({
   confirmBtnDisabled: { opacity: 0.4 },
   confirmBtnText: { color: colors.background, fontSize: 17, fontWeight: '700' },
 
-  // ── NFC animation screens ──
+  // NFC screens
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
@@ -423,24 +403,16 @@ const styles = StyleSheet.create({
   nfcArea: { width: 220, height: 220, alignItems: 'center', justifyContent: 'center' },
   ring: {
     position: 'absolute',
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    borderWidth: 2,
-    borderColor: colors.accent,
-    opacity: 0.2,
+    width: 170, height: 170, borderRadius: 85,
+    borderWidth: 2, borderColor: colors.accent, opacity: 0.2,
   },
   ringPulse: { width: 220, height: 220, borderRadius: 110, opacity: 0.1 },
   ringInner: { width: 130, height: 130, borderRadius: 65, opacity: 0.3 },
   iconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 100, height: 100, borderRadius: 50,
     backgroundColor: colors.surfaceElevated,
-    borderWidth: 2,
-    borderColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.accent,
+    alignItems: 'center', justifyContent: 'center',
   },
   iconCircleRead: { borderColor: colors.warning },
   iconCircleDone: { backgroundColor: 'rgba(61,255,168,0.12)', borderColor: colors.accent },
@@ -448,12 +420,8 @@ const styles = StyleSheet.create({
   messageBox: {
     width: '100%',
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    alignItems: 'center',
+    borderRadius: 16, borderWidth: 1, borderColor: colors.border,
+    padding: spacing.lg, gap: spacing.sm, alignItems: 'center',
   },
   messageBoxRead: { borderColor: colors.accentDim },
   messageBoxDone: { borderColor: colors.accent },

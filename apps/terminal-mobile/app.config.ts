@@ -6,7 +6,7 @@ import { config as loadEnv } from 'dotenv';
 loadEnv({ path: path.resolve(__dirname, '../../.env') });
 
 const config: ExpoConfig = {
-  name: 'GroupPay Terminal',
+  name: 'Float Terminal',
   slug: 'grouppay-terminal',
   version: '1.0.0',
   orientation: 'portrait',

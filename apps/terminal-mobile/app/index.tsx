@@ -40,8 +40,8 @@ export default function AmountScreen() {
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.brand}>GroupPay</Text>
-            <Text style={styles.role}>Merchant Terminal</Text>
+            <Text style={styles.brand}>Float</Text>
+            <Text style={styles.role}>Float Terminal</Text>
           </View>
 
           <View style={styles.amountBlock}>
