@@ -1,4 +1,4 @@
-# GroupPay
+# Float
 
 Hackathon prototype: collaborative group card with multi-person transaction approval. See [docs/plan.md](docs/plan.md) for the product checklist.
 
