@@ -10,12 +10,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../src/theme';
 
 export default function AmountScreen() {
   const router = useRouter();
-  const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -28,10 +28,7 @@ export default function AmountScreen() {
     }
     router.push({
       pathname: '/scan',
-      params: {
-        amount,
-        description: description.trim() || 'Purchase',
-      },
+      params: { amount },
     });
   };
 
@@ -58,19 +55,6 @@ export default function AmountScreen() {
               keyboardType="decimal-pad"
               returnKeyType="next"
               autoFocus
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Description (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Coffee, dinner, hotel..."
-              placeholderTextColor={colors.textMuted}
-              returnKeyType="done"
-              onSubmitEditing={handleNext}
             />
           </View>
 

@@ -163,6 +163,37 @@ export function subscribeToGroupMembers(
     .subscribe();
 }
 
+/**
+ * Subscribe to transaction_participants rows inserted for a specific user.
+ * Used to send notifications only to participants the payer explicitly selected,
+ * and only after they have confirmed (not at transaction creation time).
+ */
+export function subscribeToUserTransactionParticipants(
+  client: GroupPayClient,
+  userId: string,
+  handlers: Pick<RealtimeHandlers<TransactionParticipant>, 'onInsert'>,
+  channelSuffix = 'default',
+): RealtimeChannel {
+  const channelName = `user-tx-participants:${userId}:${channelSuffix}`;
+  removeChannelByName(client, channelName);
+  return client
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'transaction_participants',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        const row = payload.new as TransactionParticipant | undefined;
+        if (row) handlers.onInsert?.(row);
+      },
+    )
+    .subscribe();
+}
+
 export function subscribeToTransactionParticipants(
   client: GroupPayClient,
   transactionId: string,

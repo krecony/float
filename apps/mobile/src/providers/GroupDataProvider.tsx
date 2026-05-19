@@ -4,6 +4,7 @@ import {
   subscribeToGroupCard,
   subscribeToGroupMembers,
   subscribeToGroupTransactions,
+  subscribeToUserTransactionParticipants,
   unsubscribe,
   type GroupOverview,
   type Transaction,
@@ -104,20 +105,13 @@ export function GroupDataProvider({ children }: { children: ReactNode }) {
       supabase,
       activeGroupId,
       {
-        onInsert: (row) => {
+        // Refresh data on any transaction change. Notifications are intentionally
+        // NOT sent here — they fire via the transaction_participants subscription
+        // below, ensuring notifications only go out after the payer has confirmed
+        // who is splitting the payment.
+        onInsert: () => {
           void refreshOverviewRef.current();
           void refreshPendingRef.current();
-
-          // Don't notify the initiator of their own transaction.
-          if (row.created_by === sessionUserIdRef.current) return;
-
-          // Try system notification first; fall back to in-app banner.
-          void sendTransactionNotification(
-            row.description ?? 'Payment',
-            row.amount_cents,
-          ).then((sent) => {
-            if (!sent) setLatestTransaction(row);
-          });
         },
         onUpdate: () => {
           void refreshOverviewRef.current();
@@ -159,6 +153,46 @@ export function GroupDataProvider({ children }: { children: ReactNode }) {
       unsubscribe(supabase, membersChannel);
     };
   }, [activeGroupId, supabase]);
+
+  // Send notification when this user is added as a participant on a transaction.
+  // This fires after the payer calls updateTransactionParticipants, so:
+  //   • Notifications are delayed until participants are confirmed by the payer
+  //   • Only selected participants receive a notification (their row is the trigger)
+  //   • The payer themselves are excluded via the created_by check
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+
+    const partChannel = subscribeToUserTransactionParticipants(
+      supabase,
+      userId,
+      {
+        onInsert: (row) => {
+          void (async () => {
+            const { data: tx } = await supabase
+              .from('transactions')
+              .select('*')
+              .eq('id', row.transaction_id)
+              .single();
+            if (!tx) return;
+            // Don't notify the payer who just confirmed the payment.
+            if (tx.created_by === sessionUserIdRef.current) return;
+            void sendTransactionNotification(
+              tx.description ?? 'Payment',
+              tx.amount_cents,
+            ).then((sent) => {
+              if (!sent) setLatestTransaction(tx as Transaction);
+            });
+          })();
+        },
+      },
+      'group-data',
+    );
+
+    return () => {
+      unsubscribe(supabase, partChannel);
+    };
+  }, [session?.user.id, supabase]);
 
   return (
     <GroupDataContext.Provider

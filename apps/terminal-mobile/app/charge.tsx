@@ -15,11 +15,10 @@ import { colors, spacing, typography } from '../src/theme';
 export default function ChargeScreen() {
   const router = useRouter();
   const supabase = useSupabase();
-  const { groupId, userId, amount, description } = useLocalSearchParams<{
+  const { groupId, userId, amount } = useLocalSearchParams<{
     groupId: string;
     userId: string;
     amount: string;
-    description: string;
   }>();
 
   const [submitting, setSubmitting] = useState(false);
@@ -51,11 +50,11 @@ export default function ChargeScreen() {
       await createTransactionRequest(supabase, {
         groupId,
         amountCents: cents,
-        description: description || 'Purchase',
+        description: '',
         createdBy: userId,
-        participantUserIds: memberIdsRef.current,
+        participantUserIds: [],
       });
-      router.replace({ pathname: '/success', params: { amount, description } });
+      router.replace({ pathname: '/success', params: { amount } });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Transaction failed');
     } finally {
@@ -80,9 +79,6 @@ export default function ChargeScreen() {
           <Text style={styles.amountLabel}>Charging</Text>
           <Text style={styles.amount}>{formattedAmount}</Text>
 
-          {description ? (
-            <Text style={styles.descriptionText}>{description}</Text>
-          ) : null}
         </View>
 
         <Text style={styles.splitNote}>

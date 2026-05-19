@@ -68,6 +68,18 @@ export async function createTransactionRequest(
   return tx;
 }
 
+export async function updateTransactionDescription(
+  client: GroupPayClient,
+  transactionId: string,
+  description: string,
+): Promise<void> {
+  const { error } = await client
+    .from('transactions')
+    .update({ description })
+    .eq('id', transactionId);
+  if (error) throw error;
+}
+
 export async function updateTransactionParticipants(
   client: GroupPayClient,
   transactionId: string,

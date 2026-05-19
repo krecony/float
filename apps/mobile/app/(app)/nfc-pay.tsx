@@ -1,15 +1,28 @@
 import {
+  formatCents,
   subscribeToGroupTransactions,
   unsubscribe,
+  updateTransactionDescription,
   updateTransactionParticipants,
   type Transaction,
 } from '@grouppay/shared';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HCESession, NFCTagType4, NFCTagType4NDEFContentType } from 'react-native-hce';
-import { ParticipantSelectModal } from '../../src/components/ParticipantSelectModal';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useGroupData } from '../../src/providers/GroupDataProvider';
 import { useSupabase } from '../../src/providers/SupabaseProvider';
@@ -26,6 +39,8 @@ export default function NfcPayScreen() {
   const [status, setStatus] = useState<Status>('waiting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
+  const [description, setDescription] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -34,7 +49,9 @@ export default function NfcPayScreen() {
   const statusRef = useRef<Status>('waiting');
   statusRef.current = status;
 
-  // Pulsing ring animation — runs while waiting
+  const members = overview?.members ?? [];
+
+  // Pulse animation — only while waiting
   useEffect(() => {
     if (status !== 'waiting') {
       pulseLoop.current?.stop();
@@ -60,14 +77,13 @@ export default function NfcPayScreen() {
     return () => pulseLoop.current?.stop();
   }, [status, pulseAnim]);
 
-  // HCE session — starts fresh every time the screen is focused, cleans up on blur.
-  // Using useFocusEffect ensures the status and session reset when navigating back
-  // and re-opening the screen, fixing the "stuck in read state" bug.
+  // HCE session — fully reset on every screen focus, cleaned up on blur
   useFocusEffect(
     useCallback(() => {
       setStatus('waiting');
       setErrorMsg(null);
       setCurrentTransaction(null);
+      setDescription('');
       pulseAnim.setValue(1);
 
       if (Platform.OS !== 'android') {
@@ -91,9 +107,7 @@ export default function NfcPayScreen() {
             content: payload,
             writable: false,
           });
-
           const hce = await HCESession.getInstance();
-          // Reset any stale singleton state before setting the new application.
           await hce.setEnabled(false);
           hce.setApplication(tag);
           await hce.setEnabled(true);
@@ -121,8 +135,8 @@ export default function NfcPayScreen() {
     }, [activeGroupId, session, pulseAnim])
   );
 
-  // After the terminal reads the tag, subscribe to the group's transaction inserts.
-  // The first new transaction created is the one the terminal is processing.
+  // After tap: wait for the terminal to create the transaction, then show
+  // the description input + participant selection form
   useEffect(() => {
     if (status !== 'read' || !activeGroupId) return;
 
@@ -133,6 +147,7 @@ export default function NfcPayScreen() {
         onInsert: (tx) => {
           if (statusRef.current !== 'read') return;
           setCurrentTransaction(tx);
+          setSelectedIds(new Set(members.map((m) => m.user_id)));
           setStatus('selecting');
         },
       },
@@ -142,25 +157,112 @@ export default function NfcPayScreen() {
     return () => {
       unsubscribe(supabase, channel);
     };
+  // members is intentionally excluded — we snapshot it when the modal opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, activeGroupId, supabase]);
 
-  const handleParticipantsConfirmed = async (participantIds: string[]) => {
+  const toggleMember = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleConfirm = async () => {
     if (!currentTransaction) return;
     setConfirming(true);
     try {
-      await updateTransactionParticipants(supabase, currentTransaction.id, participantIds);
+      await Promise.all([
+        updateTransactionDescription(supabase, currentTransaction.id, description.trim() || 'Purchase'),
+        updateTransactionParticipants(supabase, currentTransaction.id, Array.from(selectedIds)),
+      ]);
       setStatus('done');
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Failed to update participants');
+      setErrorMsg(e instanceof Error ? e.message : 'Failed to confirm payment');
       setStatus('error');
     } finally {
       setConfirming(false);
     }
   };
 
-  const members = overview?.members ?? [];
-  const isWaiting = status === 'waiting';
+  // ── Participant selection / description form ────────────────────────────
+  if (status === 'selecting' && currentTransaction) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
+            <View style={styles.formHeader}>
+              <Pressable onPress={() => setStatus('read')} style={styles.backBtn}>
+                <Text style={styles.backText}>← Back</Text>
+              </Pressable>
+              <Text style={styles.formTitle}>Confirm payment</Text>
+              <Text style={styles.formAmount}>
+                {formatCents(currentTransaction.amount_cents)}
+              </Text>
+            </View>
 
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>What was this for?</Text>
+              <TextInput
+                style={styles.descInput}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Coffee, dinner, hotel..."
+                placeholderTextColor={colors.textMuted}
+                returnKeyType="done"
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>
+                Who splits it? ({selectedIds.size}/{members.length})
+              </Text>
+              {members.map((m) => {
+                const name = m.users?.display_name ?? m.users?.legal_name ?? 'Member';
+                const checked = selectedIds.has(m.user_id);
+                return (
+                  <Pressable
+                    key={m.user_id}
+                    style={[styles.memberRow, checked && styles.memberRowActive]}
+                    onPress={() => toggleMember(m.user_id)}
+                  >
+                    <View style={[styles.checkbox, checked && styles.checkboxActive]}>
+                      {checked ? <Text style={styles.checkmark}>✓</Text> : null}
+                    </View>
+                    <Text style={styles.memberName}>{name}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+            <Pressable
+              style={[styles.confirmBtn, (confirming || selectedIds.size === 0) && styles.confirmBtnDisabled]}
+              onPress={handleConfirm}
+              disabled={confirming || selectedIds.size === 0}
+            >
+              {confirming ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text style={styles.confirmBtnText}>
+                  Confirm · {formatCents(currentTransaction.amount_cents)}
+                </Text>
+              )}
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── NFC status screens ──────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
@@ -172,7 +274,7 @@ export default function NfcPayScreen() {
         </View>
 
         <View style={styles.nfcArea}>
-          {isWaiting ? (
+          {status === 'waiting' ? (
             <Animated.View
               style={[styles.ring, styles.ringPulse, { transform: [{ scale: pulseAnim }] }]}
             />
@@ -195,27 +297,26 @@ export default function NfcPayScreen() {
           <View style={styles.messageBox}>
             <Text style={styles.mainText}>Hold phone to terminal</Text>
             <Text style={styles.subText}>
-              Keep this screen open and bring the back of your phone close to
-              the <Text style={styles.accentText}>GroupPay Terminal</Text> device.
+              Keep this screen open and bring the back of your phone to the{' '}
+              <Text style={styles.accentText}>GroupPay Terminal</Text>.
             </Text>
           </View>
         )}
 
-        {(status === 'read' || status === 'selecting') && (
+        {status === 'read' && (
           <View style={[styles.messageBox, styles.messageBoxRead]}>
             <Text style={[styles.mainText, styles.accentText]}>Sent to terminal!</Text>
             <Text style={styles.subText}>
-              Waiting for the merchant to confirm the amount. You will be asked
-              to choose who splits the payment.
+              Waiting for the merchant to confirm the amount…
             </Text>
           </View>
         )}
 
         {status === 'done' && currentTransaction && (
           <View style={[styles.messageBox, styles.messageBoxDone]}>
-            <Text style={[styles.mainText, styles.accentText]}>Payment confirmed</Text>
+            <Text style={[styles.mainText, styles.accentText]}>Payment sent!</Text>
             <Text style={styles.subText}>
-              The transaction has been sent for approval to all participants.
+              {formatCents(currentTransaction.amount_cents)} · group members have been notified.
             </Text>
             <Pressable style={styles.doneBtn} onPress={() => router.back()}>
               <Text style={styles.doneBtnText}>Done</Text>
@@ -226,9 +327,7 @@ export default function NfcPayScreen() {
         {status === 'unsupported' && (
           <View style={styles.messageBox}>
             <Text style={styles.errorTitle}>NFC not available</Text>
-            <Text style={styles.subText}>
-              This device does not support NFC Host Card Emulation.
-            </Text>
+            <Text style={styles.subText}>This device does not support NFC Host Card Emulation.</Text>
           </View>
         )}
 
@@ -243,19 +342,73 @@ export default function NfcPayScreen() {
           <Text style={styles.hintText}>NFC must be enabled in Android Settings. Android only.</Text>
         </View>
       </View>
-
-      <ParticipantSelectModal
-        visible={status === 'selecting'}
-        members={members}
-        onConfirm={handleParticipantsConfirmed}
-        onCancel={() => setStatus('read')}
-      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+
+  // ── Participant/description form ──
+  formScroll: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xl * 2 },
+  formHeader: { gap: spacing.xs, marginBottom: spacing.sm },
+  formTitle: { ...typography.title, color: colors.text },
+  formAmount: { fontSize: 32, fontWeight: '700', color: colors.accent },
+  field: { gap: spacing.sm },
+  fieldLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  descInput: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    color: colors.text,
+    fontSize: 16,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  memberRowActive: { borderColor: colors.accentDim },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  checkmark: { color: colors.background, fontSize: 13, fontWeight: '700' },
+  memberName: { flex: 1, color: colors.text, fontSize: 15 },
+  errorText: { color: colors.danger, fontSize: 14, textAlign: 'center' },
+  confirmBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: 14,
+    paddingVertical: spacing.md + 2,
+    alignItems: 'center',
+    minHeight: 56,
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+  },
+  confirmBtnDisabled: { opacity: 0.4 },
+  confirmBtnText: { color: colors.background, fontSize: 17, fontWeight: '700' },
+
+  // ── NFC animation screens ──
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
@@ -267,7 +420,6 @@ const styles = StyleSheet.create({
   backBtn: { alignSelf: 'flex-start' },
   backText: { color: colors.textMuted, fontSize: 15 },
   title: { ...typography.title, color: colors.text },
-
   nfcArea: { width: 220, height: 220, alignItems: 'center', justifyContent: 'center' },
   ring: {
     position: 'absolute',
@@ -293,7 +445,6 @@ const styles = StyleSheet.create({
   iconCircleRead: { borderColor: colors.warning },
   iconCircleDone: { backgroundColor: 'rgba(61,255,168,0.12)', borderColor: colors.accent },
   nfcEmoji: { fontSize: 42 },
-
   messageBox: {
     width: '100%',
     backgroundColor: colors.surface,
@@ -310,7 +461,6 @@ const styles = StyleSheet.create({
   subText: { ...typography.body, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
   accentText: { color: colors.accent },
   errorTitle: { ...typography.headline, color: colors.danger, textAlign: 'center' },
-
   doneBtn: {
     marginTop: spacing.sm,
     paddingVertical: spacing.sm,
@@ -319,7 +469,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   doneBtnText: { color: colors.background, fontWeight: '700', fontSize: 15 },
-
   hint: { marginTop: 'auto', paddingBottom: spacing.lg },
   hintText: { ...typography.caption, color: colors.border, textAlign: 'center' },
 });

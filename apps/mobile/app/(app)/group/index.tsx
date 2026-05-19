@@ -138,7 +138,7 @@ export default function GroupOverviewScreen() {
             <View key={tx.id} style={styles.row}>
               <Text style={styles.rowTitle}>{tx.description ?? 'Payment'}</Text>
               <Text style={styles.rowMeta}>
-                {formatCents(tx.amount_cents)} · {tx.status}
+                {formatCents(tx.amount_cents)}
               </Text>
             </View>
           ))

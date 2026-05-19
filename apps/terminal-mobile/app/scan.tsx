@@ -17,10 +17,7 @@ const GROUPPAY_PREFIX = 'GP|';
 
 export default function ScanScreen() {
   const router = useRouter();
-  const { amount, description } = useLocalSearchParams<{
-    amount: string;
-    description: string;
-  }>();
+  const { amount } = useLocalSearchParams<{ amount: string }>();
 
   const [nfcSupported, setNfcSupported] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +89,7 @@ export default function ScanScreen() {
             hasProcessed.current = true;
             router.push({
               pathname: '/charge',
-              params: { groupId, userId, amount, description },
+              params: { groupId, userId, amount },
             });
           } catch {
             // Unrecognised tag — ignore
@@ -113,7 +110,7 @@ export default function ScanScreen() {
       NfcManager.unregisterTagEvent().catch(() => {});
       NfcManager.setEventListener(NfcEvents.DiscoverTag, null);
     };
-  }, [amount, description, router]);
+  }, [amount, router]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -127,9 +124,6 @@ export default function ScanScreen() {
         <View style={styles.amountDisplay}>
           <Text style={styles.amountLabel}>Charging</Text>
           <Text style={styles.amountValue}>{formattedAmount}</Text>
-          {description ? (
-            <Text style={styles.descriptionText}>{description}</Text>
-          ) : null}
         </View>
 
         <View style={styles.nfcArea}>
