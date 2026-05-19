@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:pages": "NEXT_PUBLIC_BASE_PATH=/slop next build",
+    "build:pages": "NEXT_PUBLIC_BASE_PATH=/float next build",
     "start": "next start",
     "lint": "eslint"
   },
