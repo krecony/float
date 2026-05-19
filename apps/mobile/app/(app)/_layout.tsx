@@ -23,6 +23,13 @@ function TabNavigator() {
             <Ionicons name={focused ? 'card' : 'card-outline'} size={22} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            if (navigation.isFocused()) {
+              e.preventDefault();
+            }
+          },
+        })}
       />
       <Tabs.Screen
         name="members"

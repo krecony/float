@@ -1,13 +1,13 @@
 import { addPaymentMethod } from '@grouppay/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { Screen } from '../../src/components/Screen';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useSupabase } from '../../src/providers/SupabaseProvider';
-import { colors } from '../../src/theme';
+import { colors, spacing, typography } from '../../src/theme';
 import {
   parseExpiryYear,
   validatePaymentMethodForm,
@@ -66,20 +66,25 @@ export default function PaymentMethodScreen() {
         keyboardType="number-pad"
         maxLength={19}
       />
-      <Input
-        placeholder="Expiry month (MM)"
-        value={expMonth}
-        onChangeText={setExpMonth}
-        keyboardType="number-pad"
-        maxLength={2}
-      />
-      <Input
-        placeholder="Expiry year (YYYY)"
-        value={expYear}
-        onChangeText={setExpYear}
-        keyboardType="number-pad"
-        maxLength={4}
-      />
+      <View style={styles.expiryRow}>
+        <Input
+          placeholder="MM"
+          value={expMonth}
+          onChangeText={setExpMonth}
+          keyboardType="number-pad"
+          maxLength={2}
+          style={styles.expiryMonth}
+        />
+        <Text style={styles.expirySep}>/</Text>
+        <Input
+          placeholder="YYYY"
+          value={expYear}
+          onChangeText={setExpYear}
+          keyboardType="number-pad"
+          maxLength={4}
+          style={styles.expiryYear}
+        />
+      </View>
       <Text style={styles.note}>
         Full card number is stored for this hackathon demo only — not real PCI compliance.
       </Text>
@@ -91,6 +96,10 @@ export default function PaymentMethodScreen() {
 }
 
 const styles = StyleSheet.create({
+  expiryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  expiryMonth: { flex: 1 },
+  expirySep: { color: colors.textMuted, ...typography.headline },
+  expiryYear: { flex: 2 },
   note: { color: colors.textMuted, fontSize: 13 },
   error: { color: colors.danger, fontSize: 14 },
 });

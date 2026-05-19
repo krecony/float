@@ -1,12 +1,12 @@
 import { StyleSheet, TextInput, TextInputProps } from 'react-native';
 import { colors, spacing, typography } from '../theme';
 
-export function Input(props: TextInputProps) {
+export function Input({ style, ...rest }: TextInputProps) {
   return (
     <TextInput
       placeholderTextColor={colors.textMuted}
-      style={[styles.input, props.style]}
-      {...props}
+      style={[styles.input, style]}
+      {...rest}
     />
   );
 }

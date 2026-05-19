@@ -1,4 +1,6 @@
 import { formatCents } from '@grouppay/shared';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -14,6 +16,7 @@ export default function GroupOverviewScreen() {
   const { activeGroupId } = useAuth();
   const { overview, loading, error } = useGroupOverview(activeGroupId);
   const [showPan, setShowPan] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!activeGroupId) {
     return (
@@ -50,12 +53,27 @@ export default function GroupOverviewScreen() {
     ? formatExpiry(virtualCard.exp_month, virtualCard.exp_year)
     : '';
 
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(group.invite_code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <Screen
       headerRight={<GroupSwitcher />}
       title={group.name}
-      subtitle={`Invite: ${group.invite_code}`}
     >
+      <Pressable style={styles.inviteRow} onPress={handleCopy}>
+        <Text style={styles.inviteLabel}>Invite code</Text>
+        <Text style={styles.inviteCode}>{group.invite_code}</Text>
+        <Ionicons
+          name={copied ? 'checkmark-outline' : 'copy-outline'}
+          size={18}
+          color={copied ? colors.accent : colors.textMuted}
+        />
+      </Pressable>
+
       <View style={styles.cardPanel}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardLabel}>Group virtual card</Text>
@@ -74,7 +92,7 @@ export default function GroupOverviewScreen() {
         </View>
         {virtualCard ? (
           <>
-            <Text style={styles.cardPan}>{showPan ? cardPan : cardMasked}</Text>
+            <Text style={styles.cardPan} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{showPan ? cardPan : cardMasked}</Text>
             <View style={styles.cardMetaRow}>
               <Text style={styles.cardMeta}>Exp {cardExpiry}</Text>
               <Pressable onPress={() => setShowPan((prev) => !prev)}>
@@ -109,6 +127,18 @@ export default function GroupOverviewScreen() {
 
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+  inviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  inviteLabel: { color: colors.textMuted, fontSize: 13, marginRight: spacing.xs },
+  inviteCode: { flex: 1, color: colors.accent, fontWeight: '700', fontSize: 16, letterSpacing: 2 },
   cardPanel: {
     backgroundColor: colors.surfaceElevated,
     padding: spacing.lg,
@@ -119,7 +149,7 @@ const styles = StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardLabel: { color: colors.textMuted, fontSize: 14 },
-  cardPan: { ...typography.title, color: colors.text, marginTop: spacing.xs },
+  cardPan: { fontSize: 18, fontWeight: '700' as const, color: colors.text, marginTop: spacing.xs, letterSpacing: 1 },
   cardMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardMeta: { color: colors.textMuted, fontSize: 13 },
   cardToggle: { color: colors.accent, fontSize: 13 },
