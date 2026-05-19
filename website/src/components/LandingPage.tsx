@@ -10,12 +10,12 @@ import { CssFallback } from "@/components/hero/CssFallback";
 
 export function LandingPage() {
   const trackRef = useRef<HTMLElement>(null);
+  const [unveiled, setUnveiled] = useState(false);
   const { progress, progressRef, heroBlend } =
     useScrollStoryProgress(trackRef);
   const [isMobile, setIsMobile] = useState(false);
   const [useFallback, setUseFallback] = useState(false);
   const [ready, setReady] = useState(false);
-  const [unveiled, setUnveiled] = useState(false);
 
   useTimelineSounds(progress, ready && unveiled);
 

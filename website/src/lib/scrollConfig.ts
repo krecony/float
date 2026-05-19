@@ -1,7 +1,8 @@
 /**
  * Extra scroll (beyond one viewport) that drives the full story 0→1.
+ * Higher = same scroll speed, but the animation takes longer to play through.
  */
-export const ANIMATION_SCROLL_VH = 78;
+export const ANIMATION_SCROLL_VH = 200;
 
 /** Story locks at this progress — plays once per page load */
 export const STORY_COMPLETE = 0.97;
