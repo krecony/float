@@ -3,6 +3,8 @@
 A real-time collaborative payments demo built for the open track of the [Rotterdam Buildathon](https://www.buildathon.eu/).
 Groups of travellers share a virtual debit card. Every purchase requires multi-person approval before it goes through.
 
+https://github.com/user-attachments/assets/0e827a4b-d165-4bfe-b5f1-1eb0a15f0781
+
 ---
 
 ## What it does
