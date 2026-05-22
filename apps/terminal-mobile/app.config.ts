@@ -23,6 +23,9 @@ const config: ExpoConfig = {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     router: { origin: false },
+		eas: {
+			projectId: "730f2f7d-cb39-4b54-a693-04b5077b026f"
+		}
   },
 };
 
